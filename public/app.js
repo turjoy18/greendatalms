@@ -8,7 +8,27 @@ const courses = [
         image: "https://images.unsplash.com/photo-1473448912268-2022ce9509d8?ixlib=rb-1.2.1&auto=format&fit=crop&w=1950&q=80",
         duration: "6 weeks",
         level: "Beginner",
-        instructor: "Dr. Sarah Green"
+        instructor: "Dr. Sarah Green",
+        chapters: [
+            {
+                id: 1,
+                title: "Introduction to Sustainability",
+                description: "What is sustainability and why does it matter?",
+                videos: [
+                    { title: "Welcome & Overview", videoUrl: "#", duration: 300 },
+                    { title: "The Three Pillars", videoUrl: "#", duration: 420 }
+                ]
+            },
+            {
+                id: 2,
+                title: "Reducing Your Footprint",
+                description: "Practical steps to reduce your environmental impact.",
+                videos: [
+                    { title: "Energy Conservation", videoUrl: "#", duration: 360 },
+                    { title: "Water Usage", videoUrl: "#", duration: 280 }
+                ]
+            }
+        ]
     },
     {
         id: 2,
@@ -18,7 +38,27 @@ const courses = [
         image: "https://images.unsplash.com/photo-1508514177221-188b1cf16e9d?ixlib=rb-1.2.1&auto=format&fit=crop&w=1950&q=80",
         duration: "8 weeks",
         level: "Intermediate",
-        instructor: "Prof. James Wilson"
+        instructor: "Prof. James Wilson",
+        chapters: [
+            {
+                id: 1,
+                title: "Solar Power Basics",
+                description: "How solar panels work and their benefits.",
+                videos: [
+                    { title: "Solar Energy 101", videoUrl: "#", duration: 480 },
+                    { title: "Installing Solar Panels", videoUrl: "#", duration: 540 }
+                ]
+            },
+            {
+                id: 2,
+                title: "Wind & Hydro Energy",
+                description: "Exploring wind and hydroelectric power.",
+                videos: [
+                    { title: "Wind Turbines", videoUrl: "#", duration: 400 },
+                    { title: "Hydroelectric Dams", videoUrl: "#", duration: 350 }
+                ]
+            }
+        ]
     },
     {
         id: 3,
@@ -28,7 +68,27 @@ const courses = [
         image: "https://images.unsplash.com/photo-1532996122724-e3c354a0b15b?ixlib=rb-1.2.1&auto=format&fit=crop&w=1950&q=80",
         duration: "4 weeks",
         level: "Beginner",
-        instructor: "Emma Thompson"
+        instructor: "Emma Thompson",
+        chapters: [
+            {
+                id: 1,
+                title: "Zero Waste Principles",
+                description: "The philosophy and benefits of zero waste.",
+                videos: [
+                    { title: "What is Zero Waste?", videoUrl: "#", duration: 320 },
+                    { title: "The 5 R's", videoUrl: "#", duration: 260 }
+                ]
+            },
+            {
+                id: 2,
+                title: "Practical Tips",
+                description: "How to reduce waste at home and work.",
+                videos: [
+                    { title: "Composting Basics", videoUrl: "#", duration: 300 },
+                    { title: "Plastic Alternatives", videoUrl: "#", duration: 210 }
+                ]
+            }
+        ]
     },
     {
         id: 4,
@@ -38,7 +98,27 @@ const courses = [
         image: "https://images.unsplash.com/photo-1500937386664-56d1dfef3854?ixlib=rb-1.2.1&auto=format&fit=crop&w=1950&q=80",
         duration: "10 weeks",
         level: "Advanced",
-        instructor: "Dr. Michael Brown"
+        instructor: "Dr. Michael Brown",
+        chapters: [
+            {
+                id: 1,
+                title: "Organic Farming",
+                description: "Principles and practices of organic agriculture.",
+                videos: [
+                    { title: "Soil Health", videoUrl: "#", duration: 410 },
+                    { title: "Crop Rotation", videoUrl: "#", duration: 370 }
+                ]
+            },
+            {
+                id: 2,
+                title: "Agroecology",
+                description: "Integrating ecology and agriculture.",
+                videos: [
+                    { title: "Agroecological Systems", videoUrl: "#", duration: 390 },
+                    { title: "Permaculture", videoUrl: "#", duration: 430 }
+                ]
+            }
+        ]
     }
 ];
 
@@ -52,6 +132,7 @@ const paymentModal = new bootstrap.Modal(document.getElementById('paymentModal')
 const paymentForm = document.getElementById('paymentForm');
 const paymentCourseDetails = document.getElementById('paymentCourseDetails');
 const paymentTotal = document.getElementById('paymentTotal');
+const mainContent = document.getElementById('mainContent');
 
 // Bootstrap Modals
 const loginModal = new bootstrap.Modal(document.getElementById('loginModal'));
@@ -83,7 +164,7 @@ function displayCourseCatalog() {
                     </div>
                     <div class="d-flex justify-content-between align-items-center mt-3">
                         <span class="price">$${course.price}</span>
-                        <button class="btn btn-primary" onclick="showPaymentModal(${course.id})">
+                        <button class="btn btn-primary" onclick="viewCourseDetails(${course.id})">
                             Enroll Now
                         </button>
                     </div>
@@ -242,40 +323,50 @@ async function loadEnrolledCourses() {
 
 // View course details
 async function viewCourseDetails(courseId) {
-    const token = localStorage.getItem('token');
-    try {
-        const response = await fetch(`/api/courses/${courseId}`, {
-            headers: {
-                'Authorization': `Bearer ${token}`
-            }
-        });
-        const course = await response.json();
-        
-        mainContent.innerHTML = `
-            <div class="row">
-                <div class="col-md-8">
-                    <h2>${course.title}</h2>
-                    <p>${course.description}</p>
-                    <p><strong>Price: $${course.price}</strong></p>
-                    
-                    <h3>Course Content</h3>
-                    <div class="accordion" id="courseContent">
-                        ${course.chapters.map((chapter, index) => `
+    const course = courses.find(c => c.id === courseId);
+    if (!course) return;
+    courseCatalog.style.display = 'none';
+    // Hide hero section and featured courses heading
+    const heroSection = document.querySelector('.hero-section');
+    const featuredHeading = document.querySelector('h2.text-center.mb-4');
+    if (heroSection) heroSection.style.display = 'none';
+    if (featuredHeading) featuredHeading.style.display = 'none';
+    mainContent.innerHTML = `
+        <div class="row mt-4">
+            <div class="col-lg-8">
+                <h2 class="mb-1">${course.title}</h2>
+                <p class="text-muted mb-2">Instructor: ${course.instructor}</p>
+                <div class="video-container mb-4" style="background:#222;min-height:320px;display:flex;align-items:center;justify-content:center;border-radius:8px;">
+                    <span class="text-light">Course Preview Video</span>
+                </div>
+                <div class="mb-3">
+                    <span class="badge bg-success me-2">${course.level}</span>
+                    <span class="me-2"><i class="bi bi-clock"></i> ${course.duration}</span>
+                    <span class="me-2"><i class="bi bi-currency-dollar"></i> ${course.price}</span>
+                </div>
+                <p class="mb-4">${course.description}</p>
+                <button class="btn btn-link" onclick="backToCatalog()">&larr; Back to Catalog</button>
+            </div>
+            <div class="col-lg-4">
+                <div class="card shadow-sm mb-3">
+                    <div class="card-header bg-white">
+                        <strong>Course content</strong>
+                    </div>
+                    <div class="accordion" id="courseContentSidebar">
+                        ${course.chapters.map((chapter, cIdx) => `
                             <div class="accordion-item">
-                                <h2 class="accordion-header">
-                                    <button class="accordion-button ${index === 0 ? '' : 'collapsed'}" type="button" 
-                                            data-bs-toggle="collapse" data-bs-target="#chapter${chapter.id}">
+                                <h2 class="accordion-header" id="heading${chapter.id}">
+                                    <button class="accordion-button ${cIdx !== 0 ? 'collapsed' : ''}" type="button" data-bs-toggle="collapse" data-bs-target="#collapse${chapter.id}" aria-expanded="${cIdx === 0 ? 'true' : 'false'}" aria-controls="collapse${chapter.id}">
                                         ${chapter.title}
                                     </button>
                                 </h2>
-                                <div id="chapter${chapter.id}" class="accordion-collapse collapse ${index === 0 ? 'show' : ''}">
-                                    <div class="accordion-body">
-                                        <p>${chapter.description}</p>
-                                        <ul class="list-group">
+                                <div id="collapse${chapter.id}" class="accordion-collapse collapse ${cIdx === 0 ? 'show' : ''}" aria-labelledby="heading${chapter.id}" data-bs-parent="#courseContentSidebar">
+                                    <div class="accordion-body p-2">
+                                        <ul class="list-group list-group-flush">
                                             ${chapter.videos.map(video => `
-                                                <li class="list-group-item">
-                                                    <i class="bi bi-play-circle"></i> ${video.title}
-                                                    <span class="badge bg-secondary float-end">${formatDuration(video.duration)}</span>
+                                                <li class="list-group-item d-flex justify-content-between align-items-center">
+                                                    <span><i class="bi bi-play-circle me-2"></i>${video.title}</span>
+                                                    <span class="badge bg-secondary">${formatDuration(video.duration)}</span>
                                                 </li>
                                             `).join('')}
                                         </ul>
@@ -284,14 +375,13 @@ async function viewCourseDetails(courseId) {
                             </div>
                         `).join('')}
                     </div>
-                    
-                    <button class="btn btn-primary mt-3" onclick="enrollInCourse(${course.id})">Enroll Now</button>
+                    <div class="card-footer bg-white text-center">
+                        <button class="btn btn-success w-100" onclick="showPaymentModal(${course.id})">Buy Course</button>
+                    </div>
                 </div>
             </div>
-        `;
-    } catch (error) {
-        console.error('Error loading course details:', error);
-    }
+        </div>
+    `;
 }
 
 // View course content
@@ -397,6 +487,16 @@ function logout() {
     localStorage.removeItem('user');
     updateUI();
     displayCourseCatalog();
+}
+
+function backToCatalog() {
+    mainContent.innerHTML = '';
+    courseCatalog.style.display = '';
+    // Show hero section and featured courses heading again
+    const heroSection = document.querySelector('.hero-section');
+    const featuredHeading = document.querySelector('h2.text-center.mb-4');
+    if (heroSection) heroSection.style.display = '';
+    if (featuredHeading) featuredHeading.style.display = '';
 }
 
 // Initialize UI and display course catalog
