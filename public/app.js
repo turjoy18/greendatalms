@@ -12,10 +12,10 @@ let mainContent;
 let myCoursesNavItem;
 let myCertificatesNavItem;
 let myCertificatesBtn;
-
-// Bootstrap Modals
-const loginModal = new bootstrap.Modal(document.getElementById('loginModal'));
-const registerModal = new bootstrap.Modal(document.getElementById('registerModal'));
+let preCourseQuestionnaireModal;
+let preCourseQuestionnaireForm;
+let loginModal;
+let registerModal;
 
 // Add this at the top with other global variables
 let currentView = 'catalog';
@@ -36,10 +36,10 @@ document.addEventListener('DOMContentLoaded', () => {
     myCoursesNavItem = document.getElementById('myCoursesNavItem');
     myCertificatesNavItem = document.getElementById('myCertificatesNavItem');
     myCertificatesBtn = document.getElementById('myCertificatesBtn');
-
-    // Initialize Bootstrap Modals
-    const loginModal = new bootstrap.Modal(document.getElementById('loginModal'));
-    const registerModal = new bootstrap.Modal(document.getElementById('registerModal'));
+    preCourseQuestionnaireModal = new bootstrap.Modal(document.getElementById('preCourseQuestionnaireModal'));
+    preCourseQuestionnaireForm = document.getElementById('preCourseQuestionnaireForm');
+    loginModal = new bootstrap.Modal(document.getElementById('loginModal'));
+    registerModal = new bootstrap.Modal(document.getElementById('registerModal'));
 
     // Event Listeners
     if (loginBtn) {
@@ -158,11 +158,48 @@ document.addEventListener('DOMContentLoaded', () => {
                 alert('Payment successful! You are now enrolled in the course.');
                 paymentModal.hide();
                 
-                // Redirect to the course view
-                viewCourse(courseId);
+                // Show pre-course questionnaire instead of going directly to course
+                preCourseQuestionnaireForm.setAttribute('data-course-id', courseId);
+                preCourseQuestionnaireModal.show();
             } catch (error) {
                 console.error('Error enrolling in course:', error);
                 alert('Error enrolling in course. Please try again.');
+            }
+        });
+    }
+
+    if (preCourseQuestionnaireForm) {
+        preCourseQuestionnaireForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const courseId = preCourseQuestionnaireForm.getAttribute('data-course-id');
+            const formData = new FormData(preCourseQuestionnaireForm);
+            
+            try {
+                const response = await fetch(`/api/courses/${courseId}/pre-course-responses`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${localStorage.getItem('token')}`
+                    },
+                    body: JSON.stringify({
+                        motivation: formData.get('motivation'),
+                        knowledge_level: formData.get('knowledge_level'),
+                        expectations: formData.get('expectations')
+                    })
+                });
+
+                if (!response.ok) {
+                    const error = await response.json();
+                    throw new Error(error.error || 'Failed to submit questionnaire');
+                }
+
+                preCourseQuestionnaireModal.hide();
+                
+                // Now redirect to the course view
+                viewCourse(courseId);
+            } catch (error) {
+                console.error('Error submitting questionnaire:', error);
+                alert(error.message || 'Error submitting questionnaire. Please try again.');
             }
         });
     }

@@ -88,7 +88,7 @@
             <div class="modal-content">
                 <div class="modal-header">
                     <h5 class="modal-title">Register</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <div class="modal-body">
                     <form id="registerForm">
@@ -162,6 +162,83 @@
                             </div>
                         </div>
                     </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Pre-course Questionnaire Modal -->
+    <div class="modal fade" id="preCourseQuestionnaireModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Pre-course Questionnaire</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="preCourseQuestionnaireForm">
+                        <div class="mb-4">
+                            <label class="form-label fw-bold">Why did you decide to take this course?</label>
+                            <div class="form-check">
+                                <input class="form-check-input" type="radio" name="motivation" value="basic_understanding" required>
+                                <label class="form-check-label">
+                                    I want to get a basic understanding of how ESG works in business
+                                </label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="radio" name="motivation" value="document_handling">
+                                <label class="form-check-label">
+                                    My customer has given me an ESG related document to sign/fill and I want to know what to do
+                                </label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="radio" name="motivation" value="carbon_calculation">
+                                <label class="form-check-label">
+                                    I want to learn how to calculate my carbon emissions
+                                </label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="radio" name="motivation" value="work_assignment">
+                                <label class="form-check-label">
+                                    I have just been assigned the task at work and need to know what to do
+                                </label>
+                            </div>
+                        </div>
+
+                        <div class="mb-4">
+                            <label class="form-label fw-bold">I have substantial knowledge of ESG.</label>
+                            <div class="form-check">
+                                <input class="form-check-input" type="radio" name="knowledge_level" value="strongly_agree" required>
+                                <label class="form-check-label">Strongly agree</label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="radio" name="knowledge_level" value="agree">
+                                <label class="form-check-label">Agree</label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="radio" name="knowledge_level" value="neutral">
+                                <label class="form-check-label">Neutral</label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="radio" name="knowledge_level" value="disagree">
+                                <label class="form-check-label">Disagree</label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="radio" name="knowledge_level" value="strongly_disagree">
+                                <label class="form-check-label">Strongly disagree</label>
+                            </div>
+                        </div>
+
+                        <div class="mb-4">
+                            <label class="form-label fw-bold">What are your expectations from the course?</label>
+                            <textarea class="form-control" name="expectations" rows="4" required 
+                                placeholder="Please share your expectations and goals for this course..."></textarea>
+                        </div>
+
+                        <div class="text-end">
+                            <button type="submit" class="btn btn-primary">Submit and Start Course</button>
+                        </div>
+                    </form>
                 </div>
             </div>
         </div>

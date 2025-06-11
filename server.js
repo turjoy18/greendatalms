@@ -1,11 +1,28 @@
+const dotenv = require('dotenv');
+// Load environment variables
+dotenv.config();
+
 const express = require('express');
 const mysql = require('mysql2');
 const cors = require('cors');
-const dotenv = require('dotenv');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const path = require('path');
+const { sendWelcomeEmail, sendCertificateEmail, sendEnrollmentConfirmation } = require('./utils/emailUtils');
 
+// Log the current working directory and .env file path
+console.log('Current working directory:', process.cwd());
+console.log('.env file path:', path.resolve(process.cwd(), '.env'));
+
+// Load environment variables
 dotenv.config();
+
+// Debug all environment variables (excluding sensitive values)
+console.log('Environment variables loaded:', {
+    RESEND_API_KEY: process.env.RESEND_API_KEY ? 'Present' : 'Missing',
+    JWT_SECRET: process.env.JWT_SECRET ? 'Present' : 'Missing',
+    NODE_ENV: process.env.NODE_ENV || 'Not set'
+});
 
 const app = express();
 
@@ -102,11 +119,20 @@ app.post('/api/register', async (req, res) => {
     
     // Insert user into database
     const query = 'INSERT INTO users (email, password, first_name, last_name) VALUES (?, ?, ?, ?)';
-    db.query(query, [email, hashedPassword, first_name, last_name], (err, result) => {
+    db.query(query, [email, hashedPassword, first_name, last_name], async (err, result) => {
       if (err) {
         console.error(err);
         return res.status(500).json({ error: 'Error registering user' });
       }
+
+      // Send welcome email
+      try {
+        await sendWelcomeEmail(email, first_name);
+      } catch (emailError) {
+        console.error('Error sending welcome email:', emailError);
+        // Don't return error to user, just log it
+      }
+
       res.status(201).json({ message: 'User registered successfully' });
     });
   } catch (error) {
@@ -306,14 +332,40 @@ app.post('/api/enroll', authenticateToken, (req, res) => {
       return res.status(400).json({ error: 'Already enrolled in this course' });
     }
 
-    // If not enrolled, create new enrollment
-    const enrollQuery = 'INSERT INTO course_enrollments (user_id, course_id) VALUES (?, ?)';
-    db.query(enrollQuery, [userId, courseId], (err, result) => {
+    // Get user and course information for email
+    const userCourseQuery = `
+      SELECT u.email, u.first_name, c.title as course_title, c.description as course_description
+      FROM users u
+      JOIN courses c ON c.id = ?
+      WHERE u.id = ?
+    `;
+
+    db.query(userCourseQuery, [courseId, userId], async (err, userCourseResults) => {
       if (err) {
-        console.error('Error enrolling in course:', err);
-        return res.status(500).json({ error: 'Error enrolling in course' });
+        console.error('Error fetching user and course info:', err);
+        return res.status(500).json({ error: 'Error fetching user and course info' });
       }
-      res.status(201).json({ message: 'Successfully enrolled in course' });
+
+      const { email, first_name, course_title, course_description } = userCourseResults[0];
+
+      // If not enrolled, create new enrollment
+      const enrollQuery = 'INSERT INTO course_enrollments (user_id, course_id) VALUES (?, ?)';
+      db.query(enrollQuery, [userId, courseId], async (err, result) => {
+        if (err) {
+          console.error('Error enrolling in course:', err);
+          return res.status(500).json({ error: 'Error enrolling in course' });
+        }
+
+        // Send enrollment confirmation email
+        try {
+          await sendEnrollmentConfirmation(email, first_name, course_title, course_description);
+        } catch (emailError) {
+          console.error('Error sending enrollment confirmation email:', emailError);
+          // Don't return error to user, just log it
+        }
+
+        res.status(201).json({ message: 'Successfully enrolled in course' });
+      });
     });
   });
 });
@@ -607,7 +659,7 @@ app.get('/api/courses/:courseId/certificate-status', authenticateToken, (req, re
 });
 
 // Issue certificate for a course
-app.post('/api/courses/:courseId/issue-certificate', authenticateToken, (req, res) => {
+app.post('/api/courses/:courseId/issue-certificate', authenticateToken, async (req, res) => {
     const userId = req.user.userId;
     const courseId = req.params.courseId;
     
@@ -628,7 +680,7 @@ app.post('/api/courses/:courseId/issue-certificate', authenticateToken, (req, re
         WHERE c.id = ?
     `;
     
-    db.query(checkQuery, [userId, courseId], (err, results) => {
+    db.query(checkQuery, [userId, courseId], async (err, results) => {
         if (err) {
             console.error('Error checking certificate eligibility:', err);
             return res.status(500).json({ error: 'Error checking certificate eligibility' });
@@ -640,7 +692,7 @@ app.post('/api/courses/:courseId/issue-certificate', authenticateToken, (req, re
         
         // Check if certificate already exists
         const checkExistingQuery = 'SELECT id FROM certificates WHERE user_id = ? AND course_id = ?';
-        db.query(checkExistingQuery, [userId, courseId], (err, existingResults) => {
+        db.query(checkExistingQuery, [userId, courseId], async (err, existingResults) => {
             if (err) {
                 console.error('Error checking existing certificate:', err);
                 return res.status(500).json({ error: 'Error checking existing certificate' });
@@ -653,18 +705,100 @@ app.post('/api/courses/:courseId/issue-certificate', authenticateToken, (req, re
             // Generate certificate number
             const certificateNumber = `CERT-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
             
-            // Issue new certificate
-            const insertQuery = 'INSERT INTO certificates (user_id, course_id, certificate_number) VALUES (?, ?, ?)';
-            db.query(insertQuery, [userId, courseId, certificateNumber], (err, result) => {
+            // Get user and course information for email
+            const userCourseQuery = `
+                SELECT u.email, u.first_name, c.title as course_title
+                FROM users u
+                JOIN courses c ON c.id = ?
+                WHERE u.id = ?
+            `;
+            
+            db.query(userCourseQuery, [courseId, userId], async (err, userCourseResults) => {
                 if (err) {
-                    console.error('Error issuing certificate:', err);
-                    return res.status(500).json({ error: 'Error issuing certificate' });
+                    console.error('Error fetching user and course info:', err);
+                    return res.status(500).json({ error: 'Error fetching user and course info' });
                 }
                 
+                const { email, first_name, course_title } = userCourseResults[0];
+            
+                // Issue new certificate
+                const insertQuery = 'INSERT INTO certificates (user_id, course_id, certificate_number) VALUES (?, ?, ?)';
+                db.query(insertQuery, [userId, courseId, certificateNumber], async (err, result) => {
+                    if (err) {
+                        console.error('Error issuing certificate:', err);
+                        return res.status(500).json({ error: 'Error issuing certificate' });
+                    }
+                    
+                    // Send certificate email
+                    try {
+                        await sendCertificateEmail(email, first_name, course_title, certificateNumber);
+                    } catch (emailError) {
+                        console.error('Error sending certificate email:', emailError);
+                        // Don't return error to user, just log it
+                    }
+                    
+                    res.status(201).json({
+                        message: 'Certificate issued successfully',
+                        certificateId: result.insertId,
+                        certificateNumber
+                    });
+                });
+            });
+        });
+    });
+});
+
+// Submit pre-course questionnaire responses
+app.post('/api/courses/:courseId/pre-course-responses', authenticateToken, (req, res) => {
+    const userId = req.user.userId;
+    const courseId = req.params.courseId;
+    const { motivation, knowledge_level, expectations } = req.body;
+
+    // Validate required fields
+    if (!motivation || !knowledge_level || !expectations) {
+        return res.status(400).json({ error: 'All fields are required' });
+    }
+
+    // Check if user is enrolled in the course
+    const checkEnrollmentQuery = 'SELECT id FROM course_enrollments WHERE user_id = ? AND course_id = ?';
+    db.query(checkEnrollmentQuery, [userId, courseId], (err, results) => {
+        if (err) {
+            console.error('Error checking enrollment:', err);
+            return res.status(500).json({ error: 'Error checking enrollment' });
+        }
+
+        if (results.length === 0) {
+            return res.status(403).json({ error: 'You must be enrolled in the course to submit responses' });
+        }
+
+        // Check if responses already exist
+        const checkExistingQuery = 'SELECT id FROM pre_course_responses WHERE user_id = ? AND course_id = ?';
+        db.query(checkExistingQuery, [userId, courseId], (err, results) => {
+            if (err) {
+                console.error('Error checking existing responses:', err);
+                return res.status(500).json({ error: 'Error checking existing responses' });
+            }
+
+            if (results.length > 0) {
+                return res.status(400).json({ error: 'You have already submitted responses for this course' });
+            }
+
+            // Insert responses
+            const insertQuery = `
+                INSERT INTO pre_course_responses 
+                (user_id, course_id, motivation, knowledge_level, expectations)
+                VALUES (?, ?, ?, ?, ?)
+            `;
+            
+            db.query(insertQuery, [userId, courseId, motivation, knowledge_level, expectations], (err, result) => {
+                if (err) {
+                    console.error('Error saving responses:', err);
+                    return res.status(500).json({ error: 'Error saving responses' });
+                }
+
                 res.status(201).json({
-                    message: 'Certificate issued successfully',
-                    certificateId: result.insertId,
-                    certificateNumber
+                    message: 'Responses saved successfully',
+                    responseId: result.insertId
                 });
             });
         });

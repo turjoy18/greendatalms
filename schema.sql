@@ -150,4 +150,28 @@ CREATE TABLE IF NOT EXISTS certificates (
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
     FOREIGN KEY (course_id) REFERENCES courses(id) ON DELETE CASCADE
+);
+
+-- Pre-course Questionnaire Responses table
+CREATE TABLE IF NOT EXISTS pre_course_responses (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    user_id INT NOT NULL,
+    course_id INT NOT NULL,
+    motivation ENUM(
+        'basic_understanding',
+        'document_handling',
+        'carbon_calculation',
+        'work_assignment'
+    ) NOT NULL,
+    knowledge_level ENUM(
+        'strongly_agree',
+        'agree',
+        'neutral',
+        'disagree',
+        'strongly_disagree'
+    ) NOT NULL,
+    expectations TEXT NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (course_id) REFERENCES courses(id) ON DELETE CASCADE
 ); 
