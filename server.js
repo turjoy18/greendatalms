@@ -10,6 +10,7 @@ const jwt = require('jsonwebtoken');
 const path = require('path');
 const { sendWelcomeEmail, sendCertificateEmail, sendEnrollmentConfirmation } = require('./utils/emailUtils');
 const paypal = require('@paypal/checkout-server-sdk');
+const { generateCertificatePDF } = require('./utils/certificateUtils');
 
 // Log the current working directory and .env file path
 console.log('Current working directory:', process.cwd());
@@ -850,6 +851,40 @@ app.post('/api/paypal/capture-order', authenticateToken, async (req, res) => {
 // Endpoint to serve PayPal client ID
 app.get('/api/paypal/client-id', (req, res) => {
   res.json({ clientId: process.env.PAYPAL_CLIENT_ID });
+});
+
+// Download certificate PDF
+app.get('/api/certificates/:certificateId/download', authenticateToken, async (req, res) => {
+  const userId = req.user.userId;
+  const certificateId = req.params.certificateId;
+
+  // Get certificate and user info
+  const query = `
+    SELECT c.*, u.first_name, u.last_name
+    FROM certificates c
+    JOIN users u ON c.user_id = u.id
+    WHERE c.id = ? AND c.user_id = ?
+  `;
+  db.query(query, [certificateId, userId], async (err, results) => {
+    if (err) {
+      console.error('Error fetching certificate for download:', err);
+      return res.status(500).json({ error: 'Error fetching certificate' });
+    }
+    if (!results[0]) {
+      return res.status(404).json({ error: 'Certificate not found' });
+    }
+    const cert = results[0];
+    const userName = cert.first_name + (cert.last_name ? ' ' + cert.last_name : '');
+    try {
+      const pdfBuffer = await generateCertificatePDF(userName, cert.certificate_number);
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `attachment; filename="certificate-${cert.certificate_number}.pdf"`);
+      res.send(pdfBuffer);
+    } catch (e) {
+      console.error('Error generating certificate PDF:', e);
+      res.status(500).json({ error: 'Error generating certificate PDF' });
+    }
+  });
 });
 
 // Start server

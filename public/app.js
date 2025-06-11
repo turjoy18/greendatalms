@@ -1353,7 +1353,7 @@ async function showMyCertificates() {
                             <p><strong>Certificate Number:</strong> ${cert.certificate_number}</p>
                             <p><strong>Issue Date:</strong> ${new Date(cert.issue_date).toLocaleDateString()}</p>
                         </div>
-                        <button class="btn btn-primary mt-3" onclick="downloadCertificate('${cert.certificate_number}')">
+                        <button class="btn btn-primary mt-3" onclick="downloadCertificate('${cert.id}')">
                             <i class="bi bi-download"></i> Download Certificate
                         </button>
                     </div>
@@ -1370,9 +1370,38 @@ async function showMyCertificates() {
     }
 }
 
-// Download Certificate (placeholder function - you can implement actual PDF generation later)
-function downloadCertificate(certificateNumber) {
-    alert('Certificate download functionality will be implemented soon!');
+// Download Certificate (real implementation)
+function downloadCertificate(certificateId) {
+    const token = localStorage.getItem('token');
+    if (!token) {
+        alert('You must be logged in to download certificates.');
+        return;
+    }
+    // Use fetch to get the PDF as a blob
+    fetch(`/api/certificates/${certificateId}/download`, {
+        headers: {
+            'Authorization': `Bearer ${token}`
+        }
+    })
+    .then(response => {
+        if (!response.ok) throw new Error('Failed to download certificate');
+        return response.blob();
+    })
+    .then(blob => {
+        // Create a link and trigger download
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `certificate-${certificateId}.pdf`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        window.URL.revokeObjectURL(url);
+    })
+    .catch(err => {
+        alert('Error downloading certificate.');
+        console.error(err);
+    });
 }
 
 // Check certificate eligibility when viewing course
