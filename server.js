@@ -9,6 +9,7 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const path = require('path');
 const { sendWelcomeEmail, sendCertificateEmail, sendEnrollmentConfirmation } = require('./utils/emailUtils');
+const paypal = require('@paypal/checkout-server-sdk');
 
 // Log the current working directory and .env file path
 console.log('Current working directory:', process.cwd());
@@ -108,6 +109,24 @@ app.use((req, res, next) => {
     console.log(`${req.method} ${req.url}`);
     next();
 });
+
+// PayPal SDK setup (add this near the top, after dotenv/config)
+const PAYPAL_MODE = process.env.PAYPAL_MODE || 'sandbox';
+let paypalEnvironment;
+if (PAYPAL_MODE === 'live') {
+  console.log('Using PayPal Live Environment');
+  paypalEnvironment = new paypal.core.LiveEnvironment(
+    process.env.PAYPAL_CLIENT_ID,
+    process.env.PAYPAL_CLIENT_SECRET
+  );
+} else {
+  console.log('Using PayPal Sandbox Environment');
+  paypalEnvironment = new paypal.core.SandboxEnvironment(
+    process.env.PAYPAL_CLIENT_ID,
+    process.env.PAYPAL_CLIENT_SECRET
+  );
+}
+const paypalClient = new paypal.core.PayPalHttpClient(paypalEnvironment);
 
 // Routes
 app.post('/api/register', async (req, res) => {
@@ -312,61 +331,6 @@ app.get('/api/enrolled-courses', authenticateToken, (req, res) => {
       return res.status(500).json({ error: 'Error fetching enrolled courses' });
     }
     res.json(results);
-  });
-});
-
-// Enroll in a course
-app.post('/api/enroll', authenticateToken, (req, res) => {
-  const { courseId } = req.body;
-  const userId = req.user.userId;
-
-  // First check if user is already enrolled
-  const checkQuery = 'SELECT * FROM course_enrollments WHERE user_id = ? AND course_id = ?';
-  db.query(checkQuery, [userId, courseId], (err, results) => {
-    if (err) {
-      console.error('Error checking enrollment:', err);
-      return res.status(500).json({ error: 'Error checking enrollment status' });
-    }
-
-    if (results.length > 0) {
-      return res.status(400).json({ error: 'Already enrolled in this course' });
-    }
-
-    // Get user and course information for email
-    const userCourseQuery = `
-      SELECT u.email, u.first_name, c.title as course_title, c.description as course_description
-      FROM users u
-      JOIN courses c ON c.id = ?
-      WHERE u.id = ?
-    `;
-
-    db.query(userCourseQuery, [courseId, userId], async (err, userCourseResults) => {
-      if (err) {
-        console.error('Error fetching user and course info:', err);
-        return res.status(500).json({ error: 'Error fetching user and course info' });
-      }
-
-      const { email, first_name, course_title, course_description } = userCourseResults[0];
-
-      // If not enrolled, create new enrollment
-      const enrollQuery = 'INSERT INTO course_enrollments (user_id, course_id) VALUES (?, ?)';
-      db.query(enrollQuery, [userId, courseId], async (err, result) => {
-        if (err) {
-          console.error('Error enrolling in course:', err);
-          return res.status(500).json({ error: 'Error enrolling in course' });
-        }
-
-        // Send enrollment confirmation email
-        try {
-          await sendEnrollmentConfirmation(email, first_name, course_title, course_description);
-        } catch (emailError) {
-          console.error('Error sending enrollment confirmation email:', emailError);
-          // Don't return error to user, just log it
-        }
-
-        res.status(201).json({ message: 'Successfully enrolled in course' });
-      });
-    });
   });
 });
 
@@ -803,6 +767,89 @@ app.post('/api/courses/:courseId/pre-course-responses', authenticateToken, (req,
             });
         });
     });
+});
+
+// Create PayPal order
+app.post('/api/paypal/create-order', async (req, res) => {
+  const { amount } = req.body;
+  console.log('Received /api/paypal/create-order request with amount:', amount);
+  console.log('PayPal Client ID:', process.env.PAYPAL_CLIENT_ID);
+  if (!paypalClient) {
+    console.error('PayPal client is not initialized!');
+    return res.status(500).json({ error: 'PayPal client not initialized' });
+  }
+  const request = new paypal.orders.OrdersCreateRequest();
+  request.prefer('return=representation');
+  request.requestBody({
+    intent: 'CAPTURE',
+    purchase_units: [{ amount: { currency_code: 'USD', value: amount || '10.00' } }]
+  });
+  try {
+    const order = await paypalClient.execute(request);
+    console.log('PayPal order created:', order.result && order.result.id, order.result);
+    res.json({ id: order.result.id });
+  } catch (err) {
+    console.error('PayPal create order error:', err && err.message, err && err.response && err.response.data);
+    res.status(500).json({ error: err.message, details: err.response && err.response.data });
+  }
+});
+
+// Update /api/paypal/capture-order to enroll user after payment
+app.post('/api/paypal/capture-order', authenticateToken, async (req, res) => {
+  const { orderID, courseId } = req.body;
+  const userId = req.user.userId;
+  const request = new paypal.orders.OrdersCaptureRequest(orderID);
+  request.requestBody({});
+  try {
+    const capture = await paypalClient.execute(request);
+    if (capture.result.status === 'COMPLETED') {
+      // Check if already enrolled
+      const checkQuery = 'SELECT * FROM course_enrollments WHERE user_id = ? AND course_id = ?';
+      db.query(checkQuery, [userId, courseId], (err, results) => {
+        if (err) {
+          return res.status(500).json({ error: 'Error checking enrollment status' });
+        }
+        if (results.length > 0) {
+          return res.status(200).json({ message: 'Already enrolled', capture: capture.result });
+        }
+        // Insert enrollment with payment_id
+        const enrollQuery = 'INSERT INTO course_enrollments (user_id, course_id, payment_id) VALUES (?, ?, ?)';
+        db.query(enrollQuery, [userId, courseId, orderID], async (err, result) => {
+          if (err) {
+            return res.status(500).json({ error: 'Error enrolling in course' });
+          }
+          // Optionally send confirmation email here
+          // Get user and course info for email
+          const userCourseQuery = `
+            SELECT u.email, u.first_name, c.title as course_title, c.description as course_description
+            FROM users u
+            JOIN courses c ON c.id = ?
+            WHERE u.id = ?
+          `;
+          db.query(userCourseQuery, [courseId, userId], async (err, userCourseResults) => {
+            if (!err && userCourseResults && userCourseResults[0]) {
+              const { email, first_name, course_title, course_description } = userCourseResults[0];
+              try {
+                await sendEnrollmentConfirmation(email, first_name, course_title, course_description);
+              } catch (emailError) {
+                console.error('Error sending enrollment confirmation email:', emailError);
+              }
+            }
+            res.status(201).json({ message: 'Enrolled successfully', capture: capture.result });
+          });
+        });
+      });
+    } else {
+      res.status(400).json({ error: 'Payment not completed', capture: capture.result });
+    }
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Endpoint to serve PayPal client ID
+app.get('/api/paypal/client-id', (req, res) => {
+  res.json({ clientId: process.env.PAYPAL_CLIENT_ID });
 });
 
 // Start server

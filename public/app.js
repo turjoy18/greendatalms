@@ -358,12 +358,82 @@ async function showPaymentModal(courseId) {
             </div>
         `;
         paymentTotal.textContent = `HKD ${course.price}`;
-        paymentForm.setAttribute('data-course-id', courseId);
         paymentModal.show();
+
+        // Render PayPal button
+        renderPayPalButton(courseId, course.price);
     } catch (error) {
         console.error('Error fetching course details:', error);
         alert('Error loading course details. Please try again later.');
     }
+}
+
+// Helper to load PayPal SDK if not already loaded
+function loadPayPalSdk(clientId, callback) {
+    if (document.getElementById('paypal-sdk')) {
+        callback();
+        return;
+    }
+    const script = document.createElement('script');
+    script.id = 'paypal-sdk';
+    script.src = `https://www.paypal.com/sdk/js?client-id=${clientId}`;
+    script.onload = callback;
+    document.body.appendChild(script);
+}
+
+// Render PayPal button
+function renderPayPalButton(courseId, price) {
+    const container = document.getElementById('paypal-button-container');
+    container.innerHTML = '';
+    fetch('/api/paypal/client-id')
+      .then(res => res.json())
+      .then(data => {
+        const clientId = data.clientId;
+        loadPayPalSdk(clientId, () => {
+            paypal.Buttons({
+                createOrder: function(data, actions) {
+                    console.log('About to POST to /api/paypal/create-order with amount:', price);
+                    return fetch('/api/paypal/create-order', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ amount: price })
+                    })
+                    .then(response => {
+                        console.log('PayPal create-order response status:', response.status);
+                        return response.json();
+                    })
+                    .then(data => {
+                        console.log('PayPal create-order response data:', data);
+                        return data.id;
+                    })
+                    .catch(error => {
+                        console.error('Error in fetch to /api/paypal/create-order:', error);
+                        throw error;
+                    });
+                },
+                onApprove: function(data, actions) {
+                    return fetch('/api/paypal/capture-order', {
+                        method: 'post',
+                        headers: {
+                            'content-type': 'application/json',
+                            'authorization': 'Bearer ' + localStorage.getItem('token')
+                        },
+                        body: JSON.stringify({ orderID: data.orderID, courseId })
+                    })
+                    .then(res => res.json())
+                    .then(details => {
+                        if (details.message === 'Enrolled successfully') {
+                            paymentModal.hide();
+                            preCourseQuestionnaireForm.setAttribute('data-course-id', courseId);
+                            preCourseQuestionnaireModal.show();
+                        } else {
+                            alert('Payment failed or already enrolled.');
+                        }
+                    });
+                }
+            }).render('#paypal-button-container');
+        });
+      });
 }
 
 // Update UI based on user role

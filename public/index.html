@@ -126,27 +126,8 @@
                 <div class="modal-body">
                     <div class="row">
                         <div class="col-md-8">
-                            <form id="paymentForm" class="payment-form">
-                                <div class="mb-3">
-                                    <label class="form-label">Card Number</label>
-                                    <input type="text" class="form-control" placeholder="1234 5678 9012 3456" required>
-                                </div>
-                                <div class="row">
-                                    <div class="col-md-6 mb-3">
-                                        <label class="form-label">Expiry Date</label>
-                                        <input type="text" class="form-control" placeholder="MM/YY" required>
-                                    </div>
-                                    <div class="col-md-6 mb-3">
-                                        <label class="form-label">CVV</label>
-                                        <input type="text" class="form-control" placeholder="123" required>
-                                    </div>
-                                </div>
-                                <div class="mb-3">
-                                    <label class="form-label">Name on Card</label>
-                                    <input type="text" class="form-control" required>
-                                </div>
-                                <button type="submit" class="btn btn-primary">Pay Now</button>
-                            </form>
+                            <!-- PayPal Button will be rendered here -->
+                            <div id="paypal-button-container"></div>
                         </div>
                         <div class="col-md-4">
                             <div class="payment-summary">
