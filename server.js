@@ -16,38 +16,81 @@ app.use(express.static('public'));
 
 // Database connection
 const db = mysql.createConnection({
-  host: process.env.DB_HOST,
-  user: process.env.DB_USER,
-  password: process.env.DB_PASSWORD,
-  database: process.env.DB_NAME
+    host: process.env.DB_HOST,
+    user: process.env.DB_USER,
+    password: process.env.DB_PASSWORD,
+    database: process.env.DB_NAME
 });
 
 // Connect to database
 db.connect((err) => {
-  if (err) {
-    console.error('Error connecting to database:', err);
-    return;
-  }
-  console.log('Connected to MySQL database');
+    if (err) {
+        console.error('Error connecting to database:', err);
+        return;
+    }
+    console.log('Connected to MySQL database');
 });
 
 // Authentication middleware
 const authenticateToken = (req, res, next) => {
-  const authHeader = req.headers['authorization'];
-  const token = authHeader && authHeader.split(' ')[1];
+    const authHeader = req.headers['authorization'];
+    const token = authHeader && authHeader.split(' ')[1];
 
-  if (!token) {
-    return res.status(401).json({ error: 'Authentication required' });
-  }
-
-  jwt.verify(token, process.env.JWT_SECRET, (err, user) => {
-    if (err) {
-      return res.status(403).json({ error: 'Invalid token' });
+    if (!token) {
+        return res.status(401).json({ error: 'No token provided' });
     }
-    req.user = user;
-    next();
-  });
+
+    jwt.verify(token, process.env.JWT_SECRET, (err, user) => {
+        if (err) {
+            return res.status(403).json({ error: 'Invalid token' });
+        }
+        req.user = user;
+        next();
+    });
 };
+
+// Admin middleware
+const isAdmin = (req, res, next) => {
+    console.log('Checking admin status...');
+    const token = req.headers.authorization?.split(' ')[1];
+    if (!token) {
+        console.log('No token provided');
+        return res.status(401).json({ error: 'No token provided' });
+    }
+
+    jwt.verify(token, process.env.JWT_SECRET, (err, decoded) => {
+        if (err) {
+            console.log('Invalid token:', err.message);
+            return res.status(401).json({ error: 'Invalid token' });
+        }
+
+        console.log('Token decoded:', decoded);
+        // Query to check if user is admin
+        const query = 'SELECT role FROM users WHERE id = ?';
+        db.query(query, [decoded.userId], (error, results) => {
+            if (error) {
+                console.error('Error checking admin status:', error);
+                return res.status(500).json({ error: 'Error checking admin status' });
+            }
+
+            console.log('User role check results:', results);
+            if (!results.length || results[0].role !== 'admin') {
+                console.log('User is not an admin');
+                return res.status(403).json({ error: 'Not authorized as admin' });
+            }
+
+            console.log('User is admin, proceeding...');
+            req.user = decoded;
+            next();
+        });
+    });
+};
+
+// Debug middleware to log all requests
+app.use((req, res, next) => {
+    console.log(`${req.method} ${req.url}`);
+    next();
+});
 
 // Routes
 app.post('/api/register', async (req, res) => {
@@ -115,7 +158,7 @@ app.post('/api/login', async (req, res) => {
 });
 
 // Get all courses
-app.get('/api/courses', authenticateToken, (req, res) => {
+app.get('/api/courses', (req, res) => {
   const query = `
     SELECT c.*, u.first_name, u.last_name 
     FROM courses c 
@@ -124,14 +167,16 @@ app.get('/api/courses', authenticateToken, (req, res) => {
   
   db.query(query, (err, results) => {
     if (err) {
+      console.error('Error fetching courses:', err);
       return res.status(500).json({ error: 'Error fetching courses' });
     }
+    console.log('Courses fetched:', results);
     res.json(results);
   });
 });
 
 // Get course details with chapters and videos
-app.get('/api/courses/:courseId', authenticateToken, (req, res) => {
+app.get('/api/courses/:courseId', (req, res) => {
   const courseId = req.params.courseId;
   
   const query = `
@@ -155,7 +200,12 @@ app.get('/api/courses/:courseId', authenticateToken, (req, res) => {
   
   db.query(query, [courseId], (err, results) => {
     if (err) {
+      console.error('Error fetching course details:', err);
       return res.status(500).json({ error: 'Error fetching course details' });
+    }
+    
+    if (results.length === 0) {
+      return res.status(404).json({ error: 'Course not found' });
     }
     
     // Organize the results into a structured format
@@ -239,8 +289,279 @@ app.get('/api/enrolled-courses', authenticateToken, (req, res) => {
   });
 });
 
+// Enroll in a course
+app.post('/api/enroll', authenticateToken, (req, res) => {
+  const { courseId } = req.body;
+  const userId = req.user.userId;
+
+  // First check if user is already enrolled
+  const checkQuery = 'SELECT * FROM course_enrollments WHERE user_id = ? AND course_id = ?';
+  db.query(checkQuery, [userId, courseId], (err, results) => {
+    if (err) {
+      console.error('Error checking enrollment:', err);
+      return res.status(500).json({ error: 'Error checking enrollment status' });
+    }
+
+    if (results.length > 0) {
+      return res.status(400).json({ error: 'Already enrolled in this course' });
+    }
+
+    // If not enrolled, create new enrollment
+    const enrollQuery = 'INSERT INTO course_enrollments (user_id, course_id) VALUES (?, ?)';
+    db.query(enrollQuery, [userId, courseId], (err, result) => {
+      if (err) {
+        console.error('Error enrolling in course:', err);
+        return res.status(500).json({ error: 'Error enrolling in course' });
+      }
+      res.status(201).json({ message: 'Successfully enrolled in course' });
+    });
+  });
+});
+
+// Get enrolled courses for a user
+app.get('/api/enrolled-courses', authenticateToken, (req, res) => {
+  const userId = req.user.userId;
+
+  const query = `
+    SELECT c.*, ce.enrollment_date, ce.status
+    FROM courses c
+    INNER JOIN course_enrollments ce ON c.id = ce.course_id
+    WHERE ce.user_id = ? AND ce.status = 'active'
+    ORDER BY ce.enrollment_date DESC
+  `;
+
+  db.query(query, [userId], (err, results) => {
+    if (err) {
+      console.error('Error fetching enrolled courses:', err);
+      return res.status(500).json({ error: 'Error fetching enrolled courses' });
+    }
+    res.json(results);
+  });
+});
+
+// Check if user is enrolled in a course
+app.get('/api/courses/:courseId/enrollment', authenticateToken, (req, res) => {
+  const userId = req.user.userId;
+  const courseId = req.params.courseId;
+
+  const query = 'SELECT * FROM course_enrollments WHERE user_id = ? AND course_id = ? AND status = "active"';
+  
+  db.query(query, [userId, courseId], (err, results) => {
+    if (err) {
+      console.error('Error checking enrollment:', err);
+      return res.status(500).json({ error: 'Error checking enrollment status' });
+    }
+    res.json({ isEnrolled: results.length > 0 });
+  });
+});
+
+// Get user's progress for all videos in a course
+app.get('/api/courses/:courseId/progress', authenticateToken, (req, res) => {
+  const userId = req.user.userId;
+  const courseId = req.params.courseId;
+
+  // Get all videos for the course
+  const videosQuery = `
+    SELECT v.id AS video_id
+    FROM chapters ch
+    JOIN videos v ON ch.id = v.chapter_id
+    WHERE ch.course_id = ?
+  `;
+
+  db.query(videosQuery, [courseId], (err, videos) => {
+    if (err) {
+      console.error('Error fetching videos for course progress:', err);
+      return res.status(500).json({ error: 'Error fetching course progress' });
+    }
+    if (!videos.length) return res.json({});
+
+    // Get user progress for these videos
+    const videoIds = videos.map(v => v.video_id);
+    const placeholders = videoIds.map(() => '?').join(',');
+    const progressQuery = `
+      SELECT video_id, progress_percentage, watched, last_watched_position
+      FROM user_progress
+      WHERE user_id = ? AND video_id IN (${placeholders})
+    `;
+    db.query(progressQuery, [userId, ...videoIds], (err, progressRows) => {
+      if (err) {
+        console.error('Error fetching user progress:', err);
+        return res.status(500).json({ error: 'Error fetching user progress' });
+      }
+      // Map progress by video_id
+      const progressMap = {};
+      progressRows.forEach(row => {
+        progressMap[row.video_id] = {
+          progress_percentage: row.progress_percentage,
+          watched: row.watched,
+          last_watched_position: row.last_watched_position
+        };
+      });
+      res.json(progressMap);
+    });
+  });
+});
+
+// Admin Dashboard API Endpoints
+app.get('/api/admin/user-progress', isAdmin, (req, res) => {
+    console.log('Fetching user progress...');
+    const query = `
+        SELECT 
+            u.id,
+            u.first_name,
+            u.last_name,
+            COUNT(DISTINCT ce.id) as enrolled_courses,
+            SUM(CASE WHEN ce.status = 'completed' THEN 1 ELSE 0 END) as completed_courses
+        FROM users u
+        LEFT JOIN course_enrollments ce ON u.id = ce.user_id
+        WHERE u.role = 'student'
+        GROUP BY u.id, u.first_name, u.last_name
+    `;
+
+    db.query(query, (error, results) => {
+        if (error) {
+            console.error('Error fetching user progress:', error);
+            return res.status(500).json({ error: 'Error fetching user progress' });
+        }
+
+        console.log('User progress query results:', results);
+        const userProgress = results.map(user => ({
+            name: `${user.first_name} ${user.last_name}`,
+            enrolledCourses: user.enrolled_courses,
+            completedCourses: user.completed_courses,
+            completionRate: user.enrolled_courses ? 
+                Math.round((user.completed_courses / user.enrolled_courses) * 100) : 0
+        }));
+
+        console.log('User progress processed:', userProgress);
+        res.json(userProgress);
+    });
+});
+
+app.get('/api/admin/unfinished-courses', isAdmin, (req, res) => {
+    console.log('Fetching unfinished courses...');
+    const query = `
+        SELECT 
+            c.id,
+            c.title,
+            COUNT(DISTINCT ce.id) as enrollments,
+            SUM(CASE WHEN ce.status = 'completed' THEN 1 ELSE 0 END) as completed_enrollments
+        FROM courses c
+        LEFT JOIN course_enrollments ce ON c.id = ce.course_id
+        GROUP BY c.id, c.title
+        ORDER BY enrollments DESC
+    `;
+
+    console.log('Executing query:', query);
+
+    db.query(query, (error, results) => {
+        if (error) {
+            console.error('Error details:', {
+                message: error.message,
+                code: error.code,
+                sqlMessage: error.sqlMessage,
+                sqlState: error.sqlState
+            });
+            return res.status(500).json({ 
+                error: 'Error fetching unfinished courses',
+                details: error.message 
+            });
+        }
+
+        console.log('Query results:', results);
+
+        try {
+            const unfinishedCourses = results.map(course => ({
+                title: course.title,
+                enrollments: course.enrollments || 0,
+                completionRate: course.enrollments ? 
+                    Math.round((course.completed_enrollments / course.enrollments) * 100) : 0,
+                averageProgress: 0 // We'll add this back once basic query works
+            }));
+
+            console.log('Processed courses:', unfinishedCourses);
+            res.json(unfinishedCourses);
+        } catch (err) {
+            console.error('Error processing results:', err);
+            res.status(500).json({ 
+                error: 'Error processing course data',
+                details: err.message 
+            });
+        }
+    });
+});
+
+app.get('/api/admin/course-enrollments', isAdmin, (req, res) => {
+    console.log('Fetching course enrollments...');
+    const query = `
+        SELECT 
+            c.id,
+            c.title,
+            COUNT(DISTINCT ce.id) as total_enrollments,
+            SUM(CASE WHEN ce.status = 'active' THEN 1 ELSE 0 END) as active_students,
+            SUM(CASE WHEN ce.status = 'completed' THEN 1 ELSE 0 END) as completed_enrollments
+        FROM courses c
+        LEFT JOIN course_enrollments ce ON c.id = ce.course_id
+        GROUP BY c.id, c.title
+        ORDER BY total_enrollments DESC
+    `;
+
+    db.query(query, (error, results) => {
+        if (error) {
+            console.error('Error fetching course enrollments:', error);
+            return res.status(500).json({ error: 'Error fetching course enrollments' });
+        }
+
+        const courseEnrollments = results.map(course => ({
+            title: course.title,
+            totalEnrollments: course.total_enrollments,
+            activeStudents: course.active_students,
+            completionRate: course.total_enrollments ? 
+                Math.round((course.completed_enrollments / course.total_enrollments) * 100) : 0
+        }));
+
+        console.log('Course enrollments fetched successfully');
+        res.json(courseEnrollments);
+    });
+});
+
+app.get('/api/admin/total-stats', isAdmin, (req, res) => {
+    console.log('Fetching total stats...');
+    const query = `
+        SELECT 
+            (SELECT COUNT(*) FROM users WHERE role = 'student') as total_users,
+            (SELECT COUNT(*) FROM courses) as total_courses,
+            (SELECT COUNT(*) FROM course_enrollments) as total_enrollments,
+            (SELECT COUNT(*) FROM course_enrollments WHERE status = 'completed') as completed_enrollments
+    `;
+
+    db.query(query, (error, results) => {
+        if (error) {
+            console.error('Error fetching total stats:', error);
+            return res.status(500).json({ error: 'Error fetching total stats' });
+        }
+
+        const stats = results[0];
+        const completionRate = stats.total_enrollments ? 
+            Math.round((stats.completed_enrollments / stats.total_enrollments) * 100) : 0;
+
+        console.log('Total stats fetched successfully');
+        res.json({
+            totalUsers: stats.total_users,
+            totalCourses: stats.total_courses,
+            totalEnrollments: stats.total_enrollments,
+            completionRate: completionRate
+        });
+    });
+});
+
 // Start server
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
+    console.log(`Server is running on port ${PORT}`);
+    console.log('Available routes:');
+    console.log('- GET /api/admin/user-progress');
+    console.log('- GET /api/admin/unfinished-courses');
+    console.log('- GET /api/admin/course-enrollments');
+    console.log('- GET /api/admin/total-stats');
 }); 

@@ -18,16 +18,17 @@
             </button>
             <div class="collapse navbar-collapse" id="navbarNav">
                 <ul class="navbar-nav me-auto">
-                    <li class="nav-item">
+                    <li class="nav-item" id="myCoursesNavItem" style="display: none;">
                         <a class="nav-link" href="#" id="myCoursesBtn">My Courses</a>
                     </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="#" id="browseCoursesBtn">Browse Courses</a>
+                    <li class="nav-item" id="adminDashboardNavItem" style="display: none;">
+                        <a class="nav-link" href="#" id="adminDashboardLink">Admin Dashboard</a>
                     </li>
                 </ul>
-                <div class="d-flex">
+                <div class="d-flex align-items-center">
+                    <span id="userWelcome" class="text-light me-3" style="display: none;"></span>
                     <button class="btn btn-light me-2" id="loginBtn">Login</button>
-                    <button class="btn btn-outline-light" id="registerBtn">Register</button>
+                    <button class="btn btn-outline-light" id="logoutBtn" style="display: none;">Logout</button>
                 </div>
             </div>
         </div>
@@ -68,7 +69,10 @@
                             <label class="form-label">Password</label>
                             <input type="password" class="form-control" name="password" required>
                         </div>
-                        <button type="submit" class="btn btn-primary">Login</button>
+                        <div class="d-grid gap-2">
+                            <button type="submit" class="btn btn-primary" data-role="learner">Login as Learner</button>
+                            <button type="submit" class="btn btn-secondary" data-role="admin">Login as Admin</button>
+                        </div>
                     </form>
                 </div>
             </div>
