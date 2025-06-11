@@ -10,6 +10,8 @@ let paymentCourseDetails;
 let paymentTotal;
 let mainContent;
 let myCoursesNavItem;
+let myCertificatesNavItem;
+let myCertificatesBtn;
 
 // Bootstrap Modals
 const loginModal = new bootstrap.Modal(document.getElementById('loginModal'));
@@ -32,6 +34,8 @@ document.addEventListener('DOMContentLoaded', () => {
     paymentTotal = document.getElementById('paymentTotal');
     mainContent = document.getElementById('mainContent');
     myCoursesNavItem = document.getElementById('myCoursesNavItem');
+    myCertificatesNavItem = document.getElementById('myCertificatesNavItem');
+    myCertificatesBtn = document.getElementById('myCertificatesBtn');
 
     // Initialize Bootstrap Modals
     const loginModal = new bootstrap.Modal(document.getElementById('loginModal'));
@@ -53,8 +57,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const role = e.submitter.getAttribute('data-role');
             const data = {
                 email: formData.get('email'),
-                password: formData.get('password'),
-                role: role
+                password: formData.get('password')
             };
 
             try {
@@ -69,7 +72,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const result = await response.json();
                 if (response.ok) {
                     // Check if the user role matches the selected login role
-                    if ((role === 'admin' && result.user.role !== 'admin') || (role === 'learner' && result.user.role === 'admin')) {
+                    if ((role === 'admin' && result.user.role !== 'admin') || (role === 'learner' && result.user.role !== 'student')) {
                         alert('You are not authorized to log in as this role.');
                         return;
                     }
@@ -81,8 +84,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     // Update UI first
                     updateUI();
                     
-                    // Then show enrolled courses if learner
-                    if (result.user.role === 'learner') {
+                    // Then show enrolled courses if student
+                    if (result.user.role === 'student') {
                         showMyCourses();
                     } else {
                         displayCourseCatalog();
@@ -161,6 +164,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 console.error('Error enrolling in course:', error);
                 alert('Error enrolling in course. Please try again.');
             }
+        });
+    }
+
+    if (myCertificatesBtn) {
+        myCertificatesBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            showMyCertificates();
         });
     }
 
@@ -323,6 +333,7 @@ async function showPaymentModal(courseId) {
 function updateUI() {
     const token = localStorage.getItem('token');
     const user = JSON.parse(localStorage.getItem('user') || '{}');
+    const role = localStorage.getItem('role');
     
     // Helper function to safely update element display
     const updateElementDisplay = (elementId, shouldShow) => {
@@ -333,36 +344,24 @@ function updateUI() {
     };
     
     // Update navigation items
-    if (token) {
+    if (token && user) {
         updateElementDisplay('loginBtn', false);
+        updateElementDisplay('registerBtn', false);
         updateElementDisplay('logoutBtn', true);
+        updateElementDisplay('userWelcome', true);
+        updateElementDisplay('myCoursesNavItem', role === 'student');
+        updateElementDisplay('myCertificatesNavItem', role === 'student');
+        updateElementDisplay('adminDashboardNavItem', role === 'admin');
         
-        // Show/hide My Courses and Admin Dashboard based on role
-        if (user.role === 'admin') {
-            updateElementDisplay('myCoursesNavItem', false);
-            updateElementDisplay('adminDashboardNavItem', true);
-        } else {
-            updateElementDisplay('myCoursesNavItem', true);
-            updateElementDisplay('adminDashboardNavItem', false);
-        }
-
-        // Update user welcome message
-        const userWelcome = document.getElementById('userWelcome');
-        if (userWelcome) {
-            userWelcome.textContent = `Welcome, ${user.firstName || user.first_name} ${user.lastName || user.last_name}`;
-            userWelcome.style.display = 'block';
-        }
+        document.getElementById('userWelcome').textContent = `Welcome, ${user.firstName}!`;
     } else {
         updateElementDisplay('loginBtn', true);
+        updateElementDisplay('registerBtn', true);
         updateElementDisplay('logoutBtn', false);
+        updateElementDisplay('userWelcome', false);
         updateElementDisplay('myCoursesNavItem', false);
+        updateElementDisplay('myCertificatesNavItem', false);
         updateElementDisplay('adminDashboardNavItem', false);
-        
-        // Hide user welcome message
-        const userWelcome = document.getElementById('userWelcome');
-        if (userWelcome) {
-            userWelcome.style.display = 'none';
-        }
     }
     
     // Always show course catalog unless explicitly in admin view
@@ -786,6 +785,9 @@ async function viewCourse(courseId) {
                 toggleSidebarBtn.click();
             });
         }
+
+        // Add certificate eligibility check
+        await checkCertificateEligibility(courseId);
     } catch (error) {
         console.error('Error fetching course details:', error);
         if (mainContent) {
@@ -843,19 +845,18 @@ function formatDuration(seconds) {
     return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
 }
 
-// Add this function to clean up the view
+// Update cleanupView function to handle the hero and course catalog sections
 function cleanupView() {
-    // Clear any course details or other views
-    const mainContent = document.getElementById('mainContent');
+    // Show hero and course catalog sections by default
+    const heroSection = document.querySelector('.hero-section');
+    const courseCatalogSection = document.querySelector('.container.mb-5');
+    if (heroSection) heroSection.style.display = 'block';
+    if (courseCatalogSection) courseCatalogSection.style.display = 'block';
+    
+    // Clear main content
     if (mainContent) {
         mainContent.innerHTML = '';
     }
-    
-    // Show hero section and featured courses heading
-    const heroSection = document.querySelector('.hero-section');
-    const featuredHeading = document.querySelector('h2.text-center.mb-4');
-    if (heroSection) heroSection.style.display = 'block';
-    if (featuredHeading) featuredHeading.style.display = 'block';
 }
 
 // Update the logout function
@@ -1183,4 +1184,144 @@ document.addEventListener('DOMContentLoaded', () => {
             logout();
         });
     }
-}); 
+});
+
+// Show My Certificates
+async function showMyCertificates() {
+    currentView = 'certificates';
+    
+    // Clean up the entire main content area
+    const heroSection = document.querySelector('.hero-section');
+    const courseCatalogSection = document.querySelector('.container.mb-5');
+    if (heroSection) heroSection.style.display = 'none';
+    if (courseCatalogSection) courseCatalogSection.style.display = 'none';
+    
+    // Clear and set up the main content area
+    mainContent.innerHTML = `
+        <div class="container mt-4">
+            <h2 class="mb-4">My Certificates</h2>
+            <div id="certificatesList" class="row">
+                <div class="col-12 text-center">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                    <p class="mt-2">Loading certificates...</p>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    try {
+        const response = await fetch('/api/certificates', {
+            headers: {
+                'Authorization': `Bearer ${localStorage.getItem('token')}`
+            }
+        });
+        
+        if (!response.ok) {
+            throw new Error('Failed to fetch certificates');
+        }
+        
+        const certificates = await response.json();
+        
+        const certificatesList = document.getElementById('certificatesList');
+        
+        if (certificates.length === 0) {
+            certificatesList.innerHTML = `
+                <div class="col-12 text-center">
+                    <p>You haven't earned any certificates yet.</p>
+                    <p>Complete courses and pass all quizzes to earn certificates!</p>
+                </div>
+            `;
+            return;
+        }
+        
+        certificatesList.innerHTML = certificates.map(cert => `
+            <div class="col-md-6 col-lg-4 mb-4">
+                <div class="card certificate-card">
+                    <div class="card-body">
+                        <h5 class="card-title">${cert.course_title}</h5>
+                        <p class="card-text">${cert.course_description.substring(0, 150)}...</p>
+                        <div class="certificate-details">
+                            <p><strong>Certificate Number:</strong> ${cert.certificate_number}</p>
+                            <p><strong>Issue Date:</strong> ${new Date(cert.issue_date).toLocaleDateString()}</p>
+                        </div>
+                        <button class="btn btn-primary mt-3" onclick="downloadCertificate('${cert.certificate_number}')">
+                            <i class="bi bi-download"></i> Download Certificate
+                        </button>
+                    </div>
+                </div>
+            </div>
+        `).join('');
+    } catch (error) {
+        console.error('Error fetching certificates:', error);
+        document.getElementById('certificatesList').innerHTML = `
+            <div class="col-12 text-center">
+                <p class="text-danger">Error loading certificates. Please try again later.</p>
+            </div>
+        `;
+    }
+}
+
+// Download Certificate (placeholder function - you can implement actual PDF generation later)
+function downloadCertificate(certificateNumber) {
+    alert('Certificate download functionality will be implemented soon!');
+}
+
+// Check certificate eligibility when viewing course
+async function checkCertificateEligibility(courseId) {
+    try {
+        const response = await fetch(`/api/courses/${courseId}/certificate-status`, {
+            headers: {
+                'Authorization': `Bearer ${localStorage.getItem('token')}`
+            }
+        });
+        
+        if (!response.ok) {
+            throw new Error('Failed to check certificate status');
+        }
+        
+        const { eligible_for_certificate } = await response.json();
+        
+        if (eligible_for_certificate) {
+            // Add certificate button to course view
+            const certificateButton = document.createElement('button');
+            certificateButton.className = 'btn btn-success mt-3';
+            certificateButton.innerHTML = '<i class="bi bi-award"></i> Get Certificate';
+            certificateButton.onclick = () => issueCertificate(courseId);
+            
+            const courseActions = document.querySelector('.course-actions');
+            if (courseActions) {
+                courseActions.appendChild(certificateButton);
+            }
+        }
+    } catch (error) {
+        console.error('Error checking certificate eligibility:', error);
+    }
+}
+
+// Issue certificate
+async function issueCertificate(courseId) {
+    try {
+        const response = await fetch(`/api/courses/${courseId}/issue-certificate`, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${localStorage.getItem('token')}`
+            }
+        });
+        
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.error || 'Failed to issue certificate');
+        }
+        
+        const result = await response.json();
+        alert('Congratulations! Your certificate has been issued successfully.');
+        
+        // Refresh the course view or show the certificate
+        showMyCertificates();
+    } catch (error) {
+        console.error('Error issuing certificate:', error);
+        alert(error.message || 'Error issuing certificate. Please try again later.');
+    }
+} 

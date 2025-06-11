@@ -555,6 +555,122 @@ app.get('/api/admin/total-stats', isAdmin, (req, res) => {
     });
 });
 
+// Get user's certificates
+app.get('/api/certificates', authenticateToken, (req, res) => {
+    const userId = req.user.userId;
+    
+    const query = `
+        SELECT c.*, co.title as course_title, co.description as course_description
+        FROM certificates c
+        JOIN courses co ON c.course_id = co.id
+        WHERE c.user_id = ?
+        ORDER BY c.issue_date DESC
+    `;
+    
+    db.query(query, [userId], (err, results) => {
+        if (err) {
+            console.error('Error fetching certificates:', err);
+            return res.status(500).json({ error: 'Error fetching certificates' });
+        }
+        res.json(results);
+    });
+});
+
+// Check if user has completed all quizzes for a course
+app.get('/api/courses/:courseId/certificate-status', authenticateToken, (req, res) => {
+    const userId = req.user.userId;
+    const courseId = req.params.courseId;
+    
+    const query = `
+        SELECT 
+            CASE 
+                WHEN COUNT(DISTINCT q.id) = COUNT(DISTINCT qa.id) 
+                AND COUNT(DISTINCT qa.id) > 0 
+                AND MIN(qa.passed) = 1 
+                THEN true 
+                ELSE false 
+            END as eligible_for_certificate
+        FROM courses c
+        JOIN chapters ch ON c.id = ch.course_id
+        JOIN quizzes q ON ch.id = q.chapter_id
+        LEFT JOIN quiz_attempts qa ON q.id = qa.quiz_id AND qa.user_id = ?
+        WHERE c.id = ?
+    `;
+    
+    db.query(query, [userId, courseId], (err, results) => {
+        if (err) {
+            console.error('Error checking certificate status:', err);
+            return res.status(500).json({ error: 'Error checking certificate status' });
+        }
+        res.json(results[0]);
+    });
+});
+
+// Issue certificate for a course
+app.post('/api/courses/:courseId/issue-certificate', authenticateToken, (req, res) => {
+    const userId = req.user.userId;
+    const courseId = req.params.courseId;
+    
+    // First check if user is eligible
+    const checkQuery = `
+        SELECT 
+            CASE 
+                WHEN COUNT(DISTINCT q.id) = COUNT(DISTINCT qa.id) 
+                AND COUNT(DISTINCT qa.id) > 0 
+                AND MIN(qa.passed) = 1 
+                THEN true 
+                ELSE false 
+            END as eligible_for_certificate
+        FROM courses c
+        JOIN chapters ch ON c.id = ch.course_id
+        JOIN quizzes q ON ch.id = q.chapter_id
+        LEFT JOIN quiz_attempts qa ON q.id = qa.quiz_id AND qa.user_id = ?
+        WHERE c.id = ?
+    `;
+    
+    db.query(checkQuery, [userId, courseId], (err, results) => {
+        if (err) {
+            console.error('Error checking certificate eligibility:', err);
+            return res.status(500).json({ error: 'Error checking certificate eligibility' });
+        }
+        
+        if (!results[0].eligible_for_certificate) {
+            return res.status(400).json({ error: 'Not eligible for certificate' });
+        }
+        
+        // Check if certificate already exists
+        const checkExistingQuery = 'SELECT id FROM certificates WHERE user_id = ? AND course_id = ?';
+        db.query(checkExistingQuery, [userId, courseId], (err, existingResults) => {
+            if (err) {
+                console.error('Error checking existing certificate:', err);
+                return res.status(500).json({ error: 'Error checking existing certificate' });
+            }
+            
+            if (existingResults.length > 0) {
+                return res.status(400).json({ error: 'Certificate already issued' });
+            }
+            
+            // Generate certificate number
+            const certificateNumber = `CERT-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+            
+            // Issue new certificate
+            const insertQuery = 'INSERT INTO certificates (user_id, course_id, certificate_number) VALUES (?, ?, ?)';
+            db.query(insertQuery, [userId, courseId, certificateNumber], (err, result) => {
+                if (err) {
+                    console.error('Error issuing certificate:', err);
+                    return res.status(500).json({ error: 'Error issuing certificate' });
+                }
+                
+                res.status(201).json({
+                    message: 'Certificate issued successfully',
+                    certificateId: result.insertId,
+                    certificateNumber
+                });
+            });
+        });
+    });
+});
+
 // Start server
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
