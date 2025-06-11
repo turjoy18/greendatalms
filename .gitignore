@@ -4,6 +4,9 @@ npm-debug.log
 yarn-debug.log
 yarn-error.log
 
+# SQL files
+*.sql
+
 # Environment variables
 .env
 .env.local
@@ -72,7 +75,6 @@ dist
 
 # Gatsby files
 .cache/
-public
 
 # vuepress build output
 .vuepress/dist

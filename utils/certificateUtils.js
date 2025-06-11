@@ -14,6 +14,10 @@ const TEMPLATE_PATH = path.join(__dirname, '../Blue Modern Certificate of Comple
 async function generateCertificatePDF(userName, certificateNumber) {
   // Read PNG template
   const pngImageBytes = fs.readFileSync(TEMPLATE_PATH);
+  console.log('[CERTIFICATE PDF] PNG template size:', pngImageBytes.length, 'bytes');
+  if (!pngImageBytes || pngImageBytes.length === 0) {
+    throw new Error('PNG template file is missing or empty!');
+  }
 
   // PNG dimensions (A4 at 150dpi): 1754x1240
   const width = 1754;

@@ -20,6 +20,11 @@ let registerModal;
 // Add this at the top with other global variables
 let currentView = 'catalog';
 
+// Initialize Stripe
+let stripe;
+let elements;
+let paymentElement;
+
 // Initialize DOM elements after page load
 document.addEventListener('DOMContentLoaded', () => {
     // Initialize DOM elements
@@ -299,7 +304,7 @@ async function displayCourseCatalog() {
                                 </span>
                             </div>
                             <div class="d-flex justify-content-between align-items-center mt-3">
-                                <span class="price">HKD ${course.price}</span>
+                                <span class="price">USD ${course.price}</span>
                                 ${isEnrolled ? 
                                     `<button class="btn btn-success" onclick="viewCourse(${course.id})">
                                         Continue Learning
@@ -354,17 +359,122 @@ async function showPaymentModal(courseId) {
         paymentCourseDetails.innerHTML = `
             <div class="d-flex justify-content-between mb-2">
                 <span>${course.title}</span>
-                <span>HKD ${course.price}</span>
+                <span>USD ${course.price}</span>
             </div>
         `;
-        paymentTotal.textContent = `HKD ${course.price}`;
+        paymentTotal.textContent = `USD ${course.price}`;
         paymentModal.show();
 
-        // Render PayPal button
-        renderPayPalButton(courseId, course.price);
+        // Initialize payment methods
+        initializePaymentMethods(courseId, course.price);
     } catch (error) {
         console.error('Error fetching course details:', error);
         alert('Error loading course details. Please try again later.');
+    }
+}
+
+// Initialize payment methods
+async function initializePaymentMethods(courseId, price) {
+    // Initialize PayPal
+    renderPayPalButton(courseId, price);
+
+    // Get Stripe publishable key
+    const keyResponse = await fetch('/api/stripe/publishable-key');
+    const { publishableKey } = await keyResponse.json();
+
+    // Initialize Stripe
+    const stripeResponse = await fetch('/api/stripe/create-payment-intent', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${localStorage.getItem('token')}`
+        },
+        body: JSON.stringify({
+            amount: price,
+            courseId: courseId
+        })
+    });
+
+    const { clientSecret } = await stripeResponse.json();
+
+    // Initialize Stripe
+    stripe = Stripe(publishableKey);
+    elements = stripe.elements({ clientSecret });
+    paymentElement = elements.create('payment');
+    paymentElement.mount('#payment-element');
+
+    // Add payment method selection handlers
+    document.getElementById('paypalMethod').addEventListener('change', function() {
+        if (this.checked) {
+            document.getElementById('paypal-button-container').style.display = 'block';
+            document.getElementById('stripe-payment-form').style.display = 'none';
+        }
+    });
+
+    document.getElementById('stripeMethod').addEventListener('change', function() {
+        if (this.checked) {
+            document.getElementById('paypal-button-container').style.display = 'none';
+            document.getElementById('stripe-payment-form').style.display = 'block';
+        }
+    });
+
+    // Handle Stripe form submission
+    const form = document.getElementById('payment-form');
+    form.addEventListener('submit', async (event) => {
+        event.preventDefault();
+        await handleStripePayment(courseId);
+    });
+}
+
+// Handle Stripe payment
+async function handleStripePayment(courseId) {
+    const submitButton = document.getElementById('submit-payment');
+    const messageDiv = document.getElementById('payment-message');
+    
+    submitButton.disabled = true;
+    submitButton.querySelector('#spinner').classList.remove('hidden');
+    submitButton.querySelector('#button-text').classList.add('hidden');
+
+    try {
+        const { error, paymentIntent } = await stripe.confirmPayment({
+            elements,
+            confirmParams: {
+                return_url: `${window.location.origin}/payment-success.html`,
+            }
+        });
+
+        if (error) {
+            messageDiv.textContent = error.message;
+            messageDiv.classList.remove('hidden');
+        } else {
+            // Payment successful, confirm on server
+            const response = await fetch('/api/stripe/confirm-payment', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${localStorage.getItem('token')}`
+                },
+                body: JSON.stringify({
+                    paymentIntentId: paymentIntent.id,
+                    courseId: courseId
+                })
+            });
+
+            if (response.ok) {
+                paymentModal.hide();
+                preCourseQuestionnaireForm.setAttribute('data-course-id', courseId);
+                preCourseQuestionnaireModal.show();
+            } else {
+                throw new Error('Failed to confirm payment');
+            }
+        }
+    } catch (error) {
+        messageDiv.textContent = 'An error occurred. Please try again.';
+        messageDiv.classList.remove('hidden');
+    } finally {
+        submitButton.disabled = false;
+        submitButton.querySelector('#spinner').classList.add('hidden');
+        submitButton.querySelector('#button-text').classList.remove('hidden');
     }
 }
 
@@ -624,7 +734,7 @@ async function viewCourseDetails(courseId) {
                         <div class="mb-3">
                             <span class="badge bg-success me-2">Beginner</span>
                             <span class="me-2"><i class="bi bi-clock"></i> Self-paced</span>
-                            <span class="me-2"><i class="bi bi-currency-dollar"></i> HKD ${course.price}</span>
+                            <span class="me-2"><i class="bi bi-currency-dollar"></i> USD ${course.price}</span>
                         </div>
                         <div class="mb-4" id="courseDescription"></div>
                     </div>
@@ -1377,7 +1487,6 @@ function downloadCertificate(certificateId) {
         alert('You must be logged in to download certificates.');
         return;
     }
-    // Use fetch to get the PDF as a blob
     fetch(`/api/certificates/${certificateId}/download`, {
         headers: {
             'Authorization': `Bearer ${token}`
@@ -1385,14 +1494,20 @@ function downloadCertificate(certificateId) {
     })
     .then(response => {
         if (!response.ok) throw new Error('Failed to download certificate');
-        return response.blob();
+        // Get filename from Content-Disposition header
+        const disposition = response.headers.get('Content-Disposition');
+        let filename = `certificate-${certificateId}.pdf`;
+        if (disposition && disposition.indexOf('filename=') !== -1) {
+            const match = disposition.match(/filename="?([^";]+)"?/);
+            if (match && match[1]) filename = match[1];
+        }
+        return response.blob().then(blob => ({ blob, filename }));
     })
-    .then(blob => {
-        // Create a link and trigger download
+    .then(({ blob, filename }) => {
         const url = window.URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = `certificate-${certificateId}.pdf`;
+        a.download = filename;
         document.body.appendChild(a);
         a.click();
         a.remove();

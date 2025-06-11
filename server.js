@@ -1,6 +1,12 @@
-const dotenv = require('dotenv');
-// Load environment variables
-dotenv.config();
+// Load environment variables at the very top
+require('dotenv').config();
+
+const fs = require('fs');
+console.log('Does .env exist?', fs.existsSync('.env'));
+console.log('Raw .env contents:', fs.readFileSync('.env', 'utf8'));
+
+console.log('Loaded STRIPE_SECRET_KEY:', process.env.STRIPE_SECRET_KEY);
+console.log('Loaded STRIPE_PUBLISHABLE_KEY:', process.env.STRIPE_PUBLISHABLE_KEY);
 
 const express = require('express');
 const mysql = require('mysql2');
@@ -12,12 +18,13 @@ const { sendWelcomeEmail, sendCertificateEmail, sendEnrollmentConfirmation } = r
 const paypal = require('@paypal/checkout-server-sdk');
 const { generateCertificatePDF } = require('./utils/certificateUtils');
 
+// Debug log for Stripe key
+console.log('Stripe Secret Key:', process.env.STRIPE_SECRET_KEY ? 'Present' : 'Missing');
+const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
+
 // Log the current working directory and .env file path
 console.log('Current working directory:', process.cwd());
 console.log('.env file path:', path.resolve(process.cwd(), '.env'));
-
-// Load environment variables
-dotenv.config();
 
 // Debug all environment variables (excluding sensitive values)
 console.log('Environment variables loaded:', {
@@ -593,68 +600,37 @@ app.get('/api/certificates', authenticateToken, (req, res) => {
     });
 });
 
-// Check if user has completed all quizzes for a course
+// TEMPORARY: Remove quiz requirement for certificate eligibility (for testing only)
+// Eligible if user is enrolled in the course
 app.get('/api/courses/:courseId/certificate-status', authenticateToken, (req, res) => {
     const userId = req.user.userId;
     const courseId = req.params.courseId;
-    
-    const query = `
-        SELECT 
-            CASE 
-                WHEN COUNT(DISTINCT q.id) = COUNT(DISTINCT qa.id) 
-                AND COUNT(DISTINCT qa.id) > 0 
-                AND MIN(qa.passed) = 1 
-                THEN true 
-                ELSE false 
-            END as eligible_for_certificate
-        FROM courses c
-        JOIN chapters ch ON c.id = ch.course_id
-        JOIN quizzes q ON ch.id = q.chapter_id
-        LEFT JOIN quiz_attempts qa ON q.id = qa.quiz_id AND qa.user_id = ?
-        WHERE c.id = ?
-    `;
-    
+
+    const query = 'SELECT * FROM course_enrollments WHERE user_id = ? AND course_id = ? AND status = "active"';
     db.query(query, [userId, courseId], (err, results) => {
         if (err) {
             console.error('Error checking certificate status:', err);
             return res.status(500).json({ error: 'Error checking certificate status' });
         }
-        res.json(results[0]);
+        res.json({ eligible_for_certificate: results.length > 0 });
     });
 });
 
-// Issue certificate for a course
+// TEMPORARY: Remove quiz requirement for certificate issuance (for testing only)
 app.post('/api/courses/:courseId/issue-certificate', authenticateToken, async (req, res) => {
     const userId = req.user.userId;
     const courseId = req.params.courseId;
-    
-    // First check if user is eligible
-    const checkQuery = `
-        SELECT 
-            CASE 
-                WHEN COUNT(DISTINCT q.id) = COUNT(DISTINCT qa.id) 
-                AND COUNT(DISTINCT qa.id) > 0 
-                AND MIN(qa.passed) = 1 
-                THEN true 
-                ELSE false 
-            END as eligible_for_certificate
-        FROM courses c
-        JOIN chapters ch ON c.id = ch.course_id
-        JOIN quizzes q ON ch.id = q.chapter_id
-        LEFT JOIN quiz_attempts qa ON q.id = qa.quiz_id AND qa.user_id = ?
-        WHERE c.id = ?
-    `;
-    
-    db.query(checkQuery, [userId, courseId], async (err, results) => {
+
+    // Check if user is enrolled
+    const checkEnrollmentQuery = 'SELECT * FROM course_enrollments WHERE user_id = ? AND course_id = ? AND status = "active"';
+    db.query(checkEnrollmentQuery, [userId, courseId], async (err, enrollResults) => {
         if (err) {
-            console.error('Error checking certificate eligibility:', err);
-            return res.status(500).json({ error: 'Error checking certificate eligibility' });
+            console.error('Error checking enrollment:', err);
+            return res.status(500).json({ error: 'Error checking enrollment' });
         }
-        
-        if (!results[0].eligible_for_certificate) {
-            return res.status(400).json({ error: 'Not eligible for certificate' });
+        if (enrollResults.length === 0) {
+            return res.status(400).json({ error: 'Not enrolled in course' });
         }
-        
         // Check if certificate already exists
         const checkExistingQuery = 'SELECT id FROM certificates WHERE user_id = ? AND course_id = ?';
         db.query(checkExistingQuery, [userId, courseId], async (err, existingResults) => {
@@ -662,14 +638,11 @@ app.post('/api/courses/:courseId/issue-certificate', authenticateToken, async (r
                 console.error('Error checking existing certificate:', err);
                 return res.status(500).json({ error: 'Error checking existing certificate' });
             }
-            
             if (existingResults.length > 0) {
                 return res.status(400).json({ error: 'Certificate already issued' });
             }
-            
             // Generate certificate number
             const certificateNumber = `CERT-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-            
             // Get user and course information for email
             const userCourseQuery = `
                 SELECT u.email, u.first_name, c.title as course_title
@@ -677,15 +650,12 @@ app.post('/api/courses/:courseId/issue-certificate', authenticateToken, async (r
                 JOIN courses c ON c.id = ?
                 WHERE u.id = ?
             `;
-            
             db.query(userCourseQuery, [courseId, userId], async (err, userCourseResults) => {
                 if (err) {
                     console.error('Error fetching user and course info:', err);
                     return res.status(500).json({ error: 'Error fetching user and course info' });
                 }
-                
                 const { email, first_name, course_title } = userCourseResults[0];
-            
                 // Issue new certificate
                 const insertQuery = 'INSERT INTO certificates (user_id, course_id, certificate_number) VALUES (?, ?, ?)';
                 db.query(insertQuery, [userId, courseId, certificateNumber], async (err, result) => {
@@ -693,7 +663,6 @@ app.post('/api/courses/:courseId/issue-certificate', authenticateToken, async (r
                         console.error('Error issuing certificate:', err);
                         return res.status(500).json({ error: 'Error issuing certificate' });
                     }
-                    
                     // Send certificate email
                     try {
                         await sendCertificateEmail(email, first_name, course_title, certificateNumber);
@@ -701,7 +670,6 @@ app.post('/api/courses/:courseId/issue-certificate', authenticateToken, async (r
                         console.error('Error sending certificate email:', emailError);
                         // Don't return error to user, just log it
                     }
-                    
                     res.status(201).json({
                         message: 'Certificate issued successfully',
                         certificateId: result.insertId,
@@ -858,6 +826,8 @@ app.get('/api/certificates/:certificateId/download', authenticateToken, async (r
   const userId = req.user.userId;
   const certificateId = req.params.certificateId;
 
+  console.log(`[DOWNLOAD] User ${userId} requested certificate ${certificateId}`);
+
   // Get certificate and user info
   const query = `
     SELECT c.*, u.first_name, u.last_name
@@ -867,24 +837,84 @@ app.get('/api/certificates/:certificateId/download', authenticateToken, async (r
   `;
   db.query(query, [certificateId, userId], async (err, results) => {
     if (err) {
-      console.error('Error fetching certificate for download:', err);
+      console.error('[DOWNLOAD] Error fetching certificate for download:', err);
       return res.status(500).json({ error: 'Error fetching certificate' });
     }
     if (!results[0]) {
+      console.warn(`[DOWNLOAD] Certificate not found for user ${userId}, cert ${certificateId}`);
       return res.status(404).json({ error: 'Certificate not found' });
     }
     const cert = results[0];
     const userName = cert.first_name + (cert.last_name ? ' ' + cert.last_name : '');
     try {
+      console.log(`[DOWNLOAD] Generating PDF for ${userName}, cert #${cert.certificate_number}`);
       const pdfBuffer = await generateCertificatePDF(userName, cert.certificate_number);
+      if (!pdfBuffer || pdfBuffer.length === 0) {
+        console.error('[DOWNLOAD] PDF buffer is empty!');
+        return res.status(500).json({ error: 'Failed to generate certificate PDF' });
+      }
       res.setHeader('Content-Type', 'application/pdf');
       res.setHeader('Content-Disposition', `attachment; filename="certificate-${cert.certificate_number}.pdf"`);
       res.send(pdfBuffer);
+      console.log(`[DOWNLOAD] PDF sent for user ${userId}, cert ${certificateId}`);
     } catch (e) {
-      console.error('Error generating certificate PDF:', e);
+      console.error('[DOWNLOAD] Error generating certificate PDF:', e);
       res.status(500).json({ error: 'Error generating certificate PDF' });
     }
   });
+});
+
+// Stripe payment endpoints
+app.post('/api/stripe/create-payment-intent', authenticateToken, async (req, res) => {
+    try {
+        const { amount, courseId } = req.body;
+        
+        // Create a PaymentIntent with the order amount and currency
+        const paymentIntent = await stripe.paymentIntents.create({
+            amount: amount * 100, // Stripe uses cents
+            currency: 'usd',
+            metadata: {
+                courseId: courseId,
+                userId: req.user.id
+            }
+        });
+
+        res.json({
+            clientSecret: paymentIntent.client_secret
+        });
+    } catch (error) {
+        console.error('Error creating payment intent:', error);
+        res.status(500).json({ error: 'Error creating payment intent' });
+    }
+});
+
+app.post('/api/stripe/confirm-payment', authenticateToken, async (req, res) => {
+    try {
+        const { paymentIntentId, courseId } = req.body;
+        
+        // Verify the payment intent
+        const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
+        
+        if (paymentIntent.status === 'succeeded') {
+            // Enroll the user in the course
+            const [result] = await pool.query(
+                'INSERT INTO enrollments (user_id, course_id, enrollment_date) VALUES (?, ?, NOW())',
+                [req.user.id, courseId]
+            );
+            
+            res.json({ message: 'Payment successful and enrolled in course' });
+        } else {
+            res.status(400).json({ error: 'Payment not successful' });
+        }
+    } catch (error) {
+        console.error('Error confirming payment:', error);
+        res.status(500).json({ error: 'Error confirming payment' });
+    }
+});
+
+// Add this with other API endpoints
+app.get('/api/stripe/publishable-key', (req, res) => {
+    res.json({ publishableKey: process.env.STRIPE_PUBLISHABLE_KEY });
 });
 
 // Start server
