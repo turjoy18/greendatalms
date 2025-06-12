@@ -224,6 +224,9 @@ document.addEventListener('DOMContentLoaded', () => {
 // Display course catalog
 async function displayCourseCatalog() {
     currentView = 'catalog';
+    // Show homepage sections
+    showSection('.featured-courses-section', true);
+    showSection('.join-community-section', true);
     
     // Clean up any existing views first
     cleanupView();
@@ -587,31 +590,38 @@ function updateUI() {
     }
 }
 
-// New function to handle showing My Courses
-function showMyCourses() {
-    console.log('Showing My Courses...'); // Debug log
-    
-    // Hide hero section and featured courses heading
-    const heroSection = document.querySelector('.hero-section');
-    const featuredHeading = document.querySelector('h2.text-center.mb-4');
-    if (heroSection) heroSection.style.display = 'none';
-    if (featuredHeading) featuredHeading.style.display = 'none';
+// Helper to show/hide homepage sections
+function showSection(sectionClass, show) {
+    const section = document.querySelector(sectionClass);
+    if (section) {
+        section.style.display = show ? '' : 'none';
+    }
+}
 
+// Show My Courses in mainContent, not courseCatalog
+function showMyCourses() {
+    showSection('.featured-courses-section', false);
+    showSection('.join-community-section', false);
+    const heroSection = document.querySelector('.hero-section');
+    if (heroSection) heroSection.style.display = 'none';
     // Show loading state
-    courseCatalog.innerHTML = `
-        <div class="col-12 text-center">
-            <div class="spinner-border text-primary" role="status">
-                <span class="visually-hidden">Loading...</span>
+    mainContent.innerHTML = `
+        <div class="container mt-4">
+            <h2 class="mb-4">My Courses</h2>
+            <div id="myCoursesList" class="row">
+                <div class="col-12 text-center">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                    <p class="mt-2">Loading your courses...</p>
+                </div>
             </div>
-            <p class="mt-2">Loading your courses...</p>
         </div>
     `;
-
-    // Load enrolled courses
     loadEnrolledCourses();
 }
 
-// Load enrolled courses
+// Update loadEnrolledCourses to render in mainContent
 async function loadEnrolledCourses() {
     const token = localStorage.getItem('token');
     try {
@@ -621,64 +631,52 @@ async function loadEnrolledCourses() {
             }
         });
         const enrolledCourses = await response.json();
-        
+        const myCoursesList = document.getElementById('myCoursesList');
         if (enrolledCourses.length === 0) {
-            courseCatalog.innerHTML = `
+            myCoursesList.innerHTML = `
                 <div class="col-12 text-center">
-                    <h3 class="mb-4">My Courses</h3>
                     <p>You haven't enrolled in any courses yet.</p>
                     <button class="btn btn-primary" onclick="displayCourseCatalog()">Browse Courses</button>
                 </div>
             `;
             return;
         }
-
-        courseCatalog.innerHTML = `
-            <div class="col-12">
-                <h3 class="mb-4">My Courses</h3>
-            </div>
-            ${enrolledCourses.map(course => `
-                <div class="col-md-6 col-lg-4 mb-4">
-                    <div class="card course-card h-100">
-                        <img src="${course.image || 'https://images.unsplash.com/photo-1473448912268-2022ce9509d8?ixlib=rb-1.2.1&auto=format&fit=crop&w=1950&q=80'}" 
-                             class="card-img-top" alt="${course.title}">
-                        <div class="card-body d-flex flex-column">
-                            <h5 class="card-title">${course.title}</h5>
-                            <p class="card-text flex-grow-1">${course.description.substring(0, 150)}...</p>
-                            <div class="course-features mb-3">
-                                <span class="course-feature">
-                                    <i class="bi bi-clock"></i> Self-paced
-                                </span>
-                                <span class="course-feature">
-                                    <i class="bi bi-person"></i> Beginner
-                                </span>
-                            </div>
-                            <div class="d-flex justify-content-between align-items-center mt-auto">
-                                <span class="badge bg-success">Enrolled</span>
-                                <button class="btn btn-primary" onclick="viewCourse(${course.id})">
-                                    Continue Learning
-                                </button>
-                            </div>
+        myCoursesList.innerHTML = enrolledCourses.map(course => `
+            <div class="col-md-6 col-lg-4 mb-4">
+                <div class="card course-card h-100">
+                    <img src="${course.image || 'https://images.unsplash.com/photo-1473448912268-2022ce9509d8?ixlib=rb-1.2.1&auto=format&fit=crop&w=1950&q=80'}" class="card-img-top" alt="${course.title}">
+                    <div class="card-body d-flex flex-column">
+                        <h5 class="card-title">${course.title}</h5>
+                        <p class="card-text flex-grow-1">${course.description.substring(0, 150)}...</p>
+                        <div class="course-features mb-3">
+                            <span class="course-feature"><i class="bi bi-clock"></i> Self-paced</span>
+                            <span class="course-feature"><i class="bi bi-person"></i> Beginner</span>
+                        </div>
+                        <div class="d-flex justify-content-between align-items-center mt-auto">
+                            <span class="badge bg-success">Enrolled</span>
+                            <button class="btn btn-primary" onclick="viewCourse(${course.id})">Continue Learning</button>
                         </div>
                     </div>
                 </div>
-            `).join('')}
-        `;
-    } catch (error) {
-        console.error('Error loading enrolled courses:', error);
-        courseCatalog.innerHTML = `
-            <div class="col-12 text-center">
-                <div class="alert alert-danger">
-                    Error loading your courses. Please try again later.
-                </div>
-                <button class="btn btn-primary" onclick="showMyCourses()">Retry</button>
             </div>
-        `;
+        `).join('');
+    } catch (error) {
+        const myCoursesList = document.getElementById('myCoursesList');
+        if (myCoursesList) {
+            myCoursesList.innerHTML = `
+                <div class="col-12 text-center">
+                    <div class="alert alert-danger">Error loading your courses. Please try again later.</div>
+                    <button class="btn btn-primary" onclick="showMyCourses()">Retry</button>
+                </div>
+            `;
+        }
     }
 }
 
 // View course details (for non-enrolled users)
 async function viewCourseDetails(courseId) {
+    showSection('.featured-courses-section', false);
+    showSection('.join-community-section', false);
     try {
         // First check if user is enrolled
         const enrollmentResponse = await fetch(`/api/courses/${courseId}/enrollment`, {
@@ -821,6 +819,8 @@ function formatCourseDescription(desc) {
 
 // View course (for enrolled users)
 async function viewCourse(courseId) {
+    showSection('.featured-courses-section', false);
+    showSection('.join-community-section', false);
     try {
         // Ensure mainContent is initialized
         if (!mainContent) {
@@ -1120,179 +1120,60 @@ if (navbarBrand) {
 // Admin Dashboard Functions
 async function showAdminDashboard() {
     currentView = 'admin';
-    console.log('Showing Admin Dashboard...');
-    
-    // Hide hero section and featured courses heading
+    showSection('.featured-courses-section', false);
+    showSection('.join-community-section', false);
     const heroSection = document.querySelector('.hero-section');
-    const featuredHeading = document.querySelector('h2.text-center.mb-4');
     if (heroSection) heroSection.style.display = 'none';
-    if (featuredHeading) featuredHeading.style.display = 'none';
-
+    // Set background color for admin dashboard
+    document.body.style.backgroundColor = getComputedStyle(document.documentElement).getPropertyValue('--background-color');
     // Show loading state
-    courseCatalog.innerHTML = `
-        <div class="col-12 text-center">
-            <div class="spinner-border text-primary" role="status">
-                <span class="visually-hidden">Loading...</span>
+    mainContent.innerHTML = `
+        <div class="container mt-4">
+            <div class="col-12 text-center">
+                <div class="spinner-border text-primary" role="status">
+                    <span class="visually-hidden">Loading...</span>
+                </div>
+                <p class="mt-2">Loading admin dashboard...</p>
             </div>
-            <p class="mt-2">Loading admin dashboard...</p>
         </div>
     `;
-
     try {
-        // Fetch all required data
         const [userProgress, unfinishedCourses, courseEnrollments, totalStats] = await Promise.all([
             fetchUserProgress(),
             fetchUnfinishedCourses(),
             fetchCourseEnrollments(),
             fetchTotalStats()
         ]);
-
-        // Render the dashboard
-        courseCatalog.innerHTML = `
-            <div class="col-12">
+        mainContent.innerHTML = `
+            <div class="container mt-4">
                 <h2 class="mb-4">Admin Dashboard</h2>
-                
                 <!-- Overview Cards -->
                 <div class="row mb-4">
                     <div class="col-md-3">
-                        <div class="card bg-primary text-white">
-                            <div class="card-body">
-                                <h5 class="card-title">Total Users</h5>
-                                <h2 class="card-text">${totalStats.totalUsers}</h2>
-                            </div>
-                        </div>
+                        <div class="card bg-primary text-white"><div class="card-body"><h5 class="card-title">Total Users</h5><h2 class="card-text">${totalStats.totalUsers}</h2></div></div>
                     </div>
                     <div class="col-md-3">
-                        <div class="card bg-success text-white">
-                            <div class="card-body">
-                                <h5 class="card-title">Total Courses</h5>
-                                <h2 class="card-text">${totalStats.totalCourses}</h2>
-                            </div>
-                        </div>
+                        <div class="card bg-success text-white"><div class="card-body"><h5 class="card-title">Total Courses</h5><h2 class="card-text">${totalStats.totalCourses}</h2></div></div>
                     </div>
                     <div class="col-md-3">
-                        <div class="card bg-info text-white">
-                            <div class="card-body">
-                                <h5 class="card-title">Total Enrollments</h5>
-                                <h2 class="card-text">${totalStats.totalEnrollments}</h2>
-                            </div>
-                        </div>
+                        <div class="card bg-info text-white"><div class="card-body"><h5 class="card-title">Total Enrollments</h5><h2 class="card-text">${totalStats.totalEnrollments}</h2></div></div>
                     </div>
                     <div class="col-md-3">
-                        <div class="card bg-warning text-white">
-                            <div class="card-body">
-                                <h5 class="card-title">Completion Rate</h5>
-                                <h2 class="card-text">${totalStats.completionRate}%</h2>
-                            </div>
-                        </div>
+                        <div class="card bg-warning text-white"><div class="card-body"><h5 class="card-title">Completion Rate</h5><h2 class="card-text">${totalStats.completionRate}%</h2></div></div>
                     </div>
                 </div>
-
                 <!-- User Progress -->
-                <div class="card mb-4">
-                    <div class="card-header">
-                        <h4>User Progress Overview</h4>
-                    </div>
-                    <div class="card-body">
-                        <div class="table-responsive">
-                            <table class="table">
-                                <thead>
-                                    <tr>
-                                        <th>User</th>
-                                        <th>Courses Enrolled</th>
-                                        <th>Courses Completed</th>
-                                        <th>Completion Rate</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    ${userProgress.map(user => `
-                                        <tr>
-                                            <td>${user.name}</td>
-                                            <td>${user.enrolledCourses}</td>
-                                            <td>${user.completedCourses}</td>
-                                            <td>${user.completionRate}%</td>
-                                        </tr>
-                                    `).join('')}
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                </div>
-
+                <div class="card mb-4"><div class="card-header"><h4>User Progress Overview</h4></div><div class="card-body"><div class="table-responsive"><table class="table"><thead><tr><th>User</th><th>Courses Enrolled</th><th>Courses Completed</th><th>Completion Rate</th></tr></thead><tbody>${userProgress.map(user => `<tr><td>${user.name}</td><td>${user.enrolledCourses}</td><td>${user.completedCourses}</td><td>${user.completionRate}%</td></tr>`).join('')}</tbody></table></div></div></div>
                 <!-- Most Unfinished Courses -->
-                <div class="card mb-4">
-                    <div class="card-header">
-                        <h4>Most Unfinished Courses</h4>
-                    </div>
-                    <div class="card-body">
-                        <div class="table-responsive">
-                            <table class="table">
-                                <thead>
-                                    <tr>
-                                        <th>Course</th>
-                                        <th>Enrollments</th>
-                                        <th>Completion Rate</th>
-                                        <th>Average Progress</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    ${unfinishedCourses.map(course => `
-                                        <tr>
-                                            <td>${course.title}</td>
-                                            <td>${course.enrollments}</td>
-                                            <td>${course.completionRate}%</td>
-                                            <td>${course.averageProgress}%</td>
-                                        </tr>
-                                    `).join('')}
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                </div>
-
+                <div class="card mb-4"><div class="card-header"><h4>Most Unfinished Courses</h4></div><div class="card-body"><div class="table-responsive"><table class="table"><thead><tr><th>Course</th><th>Enrollments</th><th>Completion Rate</th><th>Average Progress</th></tr></thead><tbody>${unfinishedCourses.map(course => `<tr><td>${course.title}</td><td>${course.enrollments}</td><td>${course.completionRate}%</td><td>${course.averageProgress}%</td></tr>`).join('')}</tbody></table></div></div></div>
                 <!-- Most Enrolled Courses -->
-                <div class="card mb-4">
-                    <div class="card-header">
-                        <h4>Most Enrolled Courses</h4>
-                    </div>
-                    <div class="card-body">
-                        <div class="table-responsive">
-                            <table class="table">
-                                <thead>
-                                    <tr>
-                                        <th>Course</th>
-                                        <th>Total Enrollments</th>
-                                        <th>Active Students</th>
-                                        <th>Completion Rate</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    ${courseEnrollments.map(course => `
-                                        <tr>
-                                            <td>${course.title}</td>
-                                            <td>${course.totalEnrollments}</td>
-                                            <td>${course.activeStudents}</td>
-                                            <td>${course.completionRate}%</td>
-                                        </tr>
-                                    `).join('')}
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                </div>
+                <div class="card mb-4"><div class="card-header"><h4>Most Enrolled Courses</h4></div><div class="card-body"><div class="table-responsive"><table class="table"><thead><tr><th>Course</th><th>Total Enrollments</th><th>Active Students</th><th>Completion Rate</th></tr></thead><tbody>${courseEnrollments.map(course => `<tr><td>${course.title}</td><td>${course.totalEnrollments}</td><td>${course.activeStudents}</td><td>${course.completionRate}%</td></tr>`).join('')}</tbody></table></div></div></div>
             </div>
         `;
     } catch (error) {
-        console.error('Error loading admin dashboard:', error);
-        courseCatalog.innerHTML = `
-            <div class="col-12 text-center">
-                <div class="alert alert-danger">
-                    Error loading admin dashboard. Please try again later.
-                </div>
-                <button class="btn btn-primary" onclick="showAdminDashboard()">Retry</button>
-            </div>
-        `;
+        mainContent.innerHTML = `<div class='container mt-4'><div class='alert alert-danger'>Error loading admin dashboard. Please try again later.</div></div>`;
     }
+    // Reset body background when leaving admin dashboard (handled in displayCourseCatalog)
 }
 
 // Admin Dashboard Data Fetching Functions
@@ -1403,17 +1284,13 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 });
 
-// Show My Certificates
+// Show My Certificates in mainContent, not courseCatalog
 async function showMyCertificates() {
+    showSection('.featured-courses-section', false);
+    showSection('.join-community-section', false);
     currentView = 'certificates';
-    
-    // Clean up the entire main content area
     const heroSection = document.querySelector('.hero-section');
-    const courseCatalogSection = document.querySelector('.container.mb-5');
     if (heroSection) heroSection.style.display = 'none';
-    if (courseCatalogSection) courseCatalogSection.style.display = 'none';
-    
-    // Clear and set up the main content area
     mainContent.innerHTML = `
         <div class="container mt-4">
             <h2 class="mb-4">My Certificates</h2>
@@ -1427,22 +1304,15 @@ async function showMyCertificates() {
             </div>
         </div>
     `;
-    
     try {
         const response = await fetch('/api/certificates', {
             headers: {
                 'Authorization': `Bearer ${localStorage.getItem('token')}`
             }
         });
-        
-        if (!response.ok) {
-            throw new Error('Failed to fetch certificates');
-        }
-        
+        if (!response.ok) throw new Error('Failed to fetch certificates');
         const certificates = await response.json();
-        
         const certificatesList = document.getElementById('certificatesList');
-        
         if (certificates.length === 0) {
             certificatesList.innerHTML = `
                 <div class="col-12 text-center">
@@ -1452,7 +1322,6 @@ async function showMyCertificates() {
             `;
             return;
         }
-        
         certificatesList.innerHTML = certificates.map(cert => `
             <div class="col-md-6 col-lg-4 mb-4">
                 <div class="card certificate-card">
@@ -1471,12 +1340,14 @@ async function showMyCertificates() {
             </div>
         `).join('');
     } catch (error) {
-        console.error('Error fetching certificates:', error);
-        document.getElementById('certificatesList').innerHTML = `
-            <div class="col-12 text-center">
-                <p class="text-danger">Error loading certificates. Please try again later.</p>
-            </div>
-        `;
+        const certificatesList = document.getElementById('certificatesList');
+        if (certificatesList) {
+            certificatesList.innerHTML = `
+                <div class="col-12 text-center">
+                    <p class="text-danger">Error loading certificates. Please try again later.</p>
+                </div>
+            `;
+        }
     }
 }
 

@@ -897,12 +897,14 @@ app.post('/api/stripe/confirm-payment', authenticateToken, async (req, res) => {
         
         if (paymentIntent.status === 'succeeded') {
             // Enroll the user in the course
-            const [result] = await pool.query(
-                'INSERT INTO enrollments (user_id, course_id, enrollment_date) VALUES (?, ?, NOW())',
-                [req.user.id, courseId]
-            );
-            
-            res.json({ message: 'Payment successful and enrolled in course' });
+            const query = 'INSERT INTO enrollments (user_id, course_id, enrollment_date) VALUES (?, ?, NOW())';
+            db.query(query, [req.user.id, courseId], (err, result) => {
+                if (err) {
+                    console.error('Error enrolling user:', err);
+                    return res.status(500).json({ error: 'Error enrolling in course' });
+                }
+                res.json({ message: 'Payment successful and enrolled in course' });
+            });
         } else {
             res.status(400).json({ error: 'Payment not successful' });
         }

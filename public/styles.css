@@ -16,24 +16,43 @@ body {
 }
 
 .navbar {
-    background-color: var(--primary-color) !important;
+    background: linear-gradient(rgba(255, 255, 255, 0.9), rgba(255, 255, 255, 0.9)),
+                url('https://images.unsplash.com/photo-1473448912268-2022ce9509d8?ixlib=rb-1.2.1&auto=format&fit=crop&w=1950&q=80') !important;
+    background-size: cover !important;
+    background-position: center !important;
     box-shadow: 0 2px 4px rgba(0,0,0,0.1);
 }
 
-.navbar-brand {
-    font-weight: 700;
-    font-size: 1.5rem;
-    font-family: 'Helvetica', sans-serif;
+.navbar-brand, .nav-link, #userWelcome {
+    color: var(--text-color) !important;
+}
+
+.navbar .btn-light {
+    background-color: var(--highlight-color);
+    border-color: var(--highlight-color);
+    color: var(--text-color);
+}
+
+.navbar .btn-outline-light {
+    background-color: var(--highlight-color);
+    border-color: var(--highlight-color);
+    color: var(--text-color);
+}
+
+.navbar .btn-light:hover,
+.navbar .btn-outline-light:hover {
+    background-color: var(--secondary-color);
+    border-color: var(--secondary-color);
 }
 
 .hero-section {
-    background: linear-gradient(rgba(0, 0, 0, 0.5), rgba(0, 0, 0, 0.5)),
+    background: linear-gradient(rgba(255, 255, 255, 0.85), rgba(255, 255, 255, 0.85)),
                 url('https://images.unsplash.com/photo-1473448912268-2022ce9509d8?ixlib=rb-1.2.1&auto=format&fit=crop&w=1950&q=80');
     background-size: cover;
     background-position: center;
-    color: white;
+    color: var(--text-color);
     padding: 100px 0;
-    margin-bottom: 50px;
+    margin-bottom: 0;
     text-align: center;
 }
 
@@ -80,14 +99,14 @@ body {
 
 .course-card .price {
     font-size: 1.25rem;
-    color: var(--highlight-color);
+    color: var(--secondary-color);
     font-weight: 700;
     font-family: 'Helvetica', sans-serif;
 }
 
 .course-card .btn-primary {
-    background-color: var(--primary-color);
-    border-color: var(--primary-color);
+    background-color: var(--highlight-color);
+    border-color: var(--highlight-color);
     padding: 0.5rem 1.5rem;
     border-radius: 25px;
     font-family: 'Helvetica', sans-serif;
@@ -171,13 +190,13 @@ body {
     display: flex;
     align-items: center;
     gap: 0.5rem;
-    color: var(--text-color);
+    color: var(--secondary-color);
     font-family: 'Helvetica', sans-serif;
     font-weight: 400;
 }
 
 .course-feature i {
-    color: var(--highlight-color);
+    color: var(--secondary-color);
 }
 
 .card {
@@ -191,8 +210,8 @@ body {
 }
 
 .btn-primary {
-    background-color: var(--primary-color);
-    border-color: var(--primary-color);
+    background-color: var(--highlight-color);
+    border-color: var(--highlight-color);
     font-family: 'Helvetica', sans-serif;
     font-weight: 700;
 }
@@ -288,4 +307,183 @@ body {
 .certificate-details strong {
     font-weight: 700;
     font-family: 'Helvetica', sans-serif;
+}
+
+#loginBtn {
+    background-color: var(--highlight-color);
+    border-color: var(--highlight-color);
+    color: var(--text-color);
+}
+
+#loginBtn:hover {
+    background-color: var(--secondary-color);
+    border-color: var(--secondary-color);
+}
+
+#logoutBtn {
+    background-color: var(--highlight-color);
+    border-color: var(--highlight-color);
+    color: var(--text-color);
+}
+
+#logoutBtn:hover {
+    background-color: var(--secondary-color);
+    border-color: var(--secondary-color);
+}
+
+.btn-success {
+    background-color: var(--highlight-color) !important;
+    border-color: var(--highlight-color) !important;
+    color: var(--text-color) !important;
+}
+
+.btn-success:hover {
+    background-color: var(--secondary-color) !important;
+    border-color: var(--secondary-color) !important;
+}
+
+/* Featured Courses Section */
+.featured-courses-section {
+    background-color: var(--primary-color);
+    padding: 60px 0;
+    margin-bottom: 0;
+    margin-top: 0;
+    width: 100%;
+}
+
+.featured-courses-section h2 {
+    color: white;
+    font-weight: 700;
+    margin-bottom: 2rem;
+}
+
+.featured-courses-section .course-card {
+    background: white;
+    margin-bottom: 30px;
+}
+
+.featured-courses-section .course-card .card-title {
+    color: var(--primary-color);
+}
+
+.featured-courses-section .course-feature {
+    color: var(--text-color);
+}
+
+.featured-courses-section .course-feature i {
+    color: var(--highlight-color);
+}
+
+/* Update join community section to connect with featured courses */
+.join-community-section {
+    background-color: var(--background-color);
+    padding: 80px 0;
+    margin-bottom: 0;
+    margin-top: 0;
+}
+
+.join-community-section h2 {
+    color: var(--primary-color);
+    font-weight: 700;
+    margin-bottom: 1.5rem;
+}
+
+.join-community-section .lead {
+    color: var(--text-color);
+    margin-bottom: 2rem;
+}
+
+.community-features {
+    list-style: none;
+    padding: 0;
+    margin-bottom: 2rem;
+}
+
+.community-features li {
+    margin-bottom: 1rem;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    color: var(--text-color);
+}
+
+.community-features i {
+    color: var(--highlight-color);
+    font-size: 1.5rem;
+}
+
+.join-community-section img {
+    max-width: 100%;
+    height: auto;
+    border-radius: 10px;
+}
+
+/* Footer */
+.footer {
+    background-color: var(--primary-color);
+    color: white;
+    padding: 60px 0 30px;
+    margin-top: 0;
+}
+
+.footer h5 {
+    color: white;
+    font-weight: 600;
+    margin-bottom: 1.5rem;
+}
+
+.footer p {
+    color: rgba(255, 255, 255, 0.8);
+}
+
+.footer ul li {
+    margin-bottom: 0.75rem;
+}
+
+.footer a {
+    color: rgba(255, 255, 255, 0.8);
+    text-decoration: none;
+    transition: color 0.3s ease;
+}
+
+.footer a:hover {
+    color: var(--highlight-color);
+}
+
+.social-links {
+    display: flex;
+    gap: 1rem;
+    margin-top: 1rem;
+}
+
+.social-links a {
+    color: white;
+    font-size: 1.5rem;
+    transition: color 0.3s ease;
+}
+
+.social-links a:hover {
+    color: var(--highlight-color);
+}
+
+/* Ensure mainContent doesn't overlap with footer */
+#mainContent {
+    min-height: 0;
+    padding-bottom: 0;
+}
+
+/* Sticky footer for all pages */
+html, body {
+    height: 100%;
+}
+body {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+}
+#mainContent {
+    flex: 1 0 auto;
+}
+.footer {
+    flex-shrink: 0;
 } 
