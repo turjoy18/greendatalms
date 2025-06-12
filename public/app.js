@@ -46,6 +46,9 @@ document.addEventListener('DOMContentLoaded', () => {
     loginModal = new bootstrap.Modal(document.getElementById('loginModal'));
     registerModal = new bootstrap.Modal(document.getElementById('registerModal'));
 
+    const allCoursesBtn = document.getElementById('allCoursesBtn');
+    const allTemplatesBtn = document.getElementById('allTemplatesBtn');
+
     // Event Listeners
     if (loginBtn) {
         loginBtn.addEventListener('click', () => loginModal.show());
@@ -219,6 +222,47 @@ document.addEventListener('DOMContentLoaded', () => {
     // Initialize the page
     displayCourseCatalog();
     updateUI();
+
+    // Show/hide All Courses and All Templates buttons based on login
+    function updateTopNavButtons() {
+        const token = localStorage.getItem('token');
+        if (!token) {
+            if (allCoursesBtn) allCoursesBtn.classList.remove('d-none');
+            if (allTemplatesBtn) allTemplatesBtn.classList.remove('d-none');
+        } else {
+            if (allCoursesBtn) allCoursesBtn.classList.add('d-none');
+            if (allTemplatesBtn) allTemplatesBtn.classList.add('d-none');
+        }
+    }
+    updateTopNavButtons();
+
+    // Also call this after login/logout
+    const origUpdateUI = updateUI;
+    updateUI = function() {
+        origUpdateUI.apply(this, arguments);
+        updateTopNavButtons();
+    };
+
+    // All Courses button shows course catalog
+    if (allCoursesBtn) {
+        allCoursesBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            displayCourseCatalog();
+        });
+    }
+    // All Templates button shows coming soon
+    if (allTemplatesBtn) {
+        allTemplatesBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            showSection('.featured-courses-section', false);
+            showSection('.join-community-section', false);
+            const heroSection = document.querySelector('.hero-section');
+            if (heroSection) heroSection.style.display = 'none';
+            if (mainContent) {
+                mainContent.innerHTML = `<div class='container mt-5 text-center'><h2>All Templates</h2><p class='lead'>Coming soon!</p></div>`;
+            }
+        });
+    }
 });
 
 // Display course catalog

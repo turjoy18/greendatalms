@@ -81,17 +81,17 @@ SET @chapter5_id = (SELECT id FROM chapters WHERE course_id = @course_id AND ord
 
 -- Insert videos for each chapter (placeholder URLs for now)
 INSERT INTO videos (chapter_id, title, description, video_url, duration) VALUES
-(@chapter1_id, 'Introduction to ESG', 'An overview of ESG principles and their importance', 'https://example.com/video1', 1800),
-(@chapter1_id, 'ESG vs CSR vs Sustainability', 'Understanding the differences between ESG, CSR, and Sustainability', 'https://example.com/video2', 1500),
-(@chapter1_id, 'ESG Drivers in Modern Business', 'Exploring the key drivers of ESG in today''s business landscape', 'https://example.com/video3', 2000),
+(@chapter1_id, 'Introduction to ESG', 'An overview of ESG principles and their importance', 'https://www.youtube-nocookie.com/embed/eJnQBXmZ7Ek?si=sjdR66r6yLLzj4mL', 1800),
+(@chapter1_id, 'ESG vs CSR vs Sustainability', 'Understanding the differences between ESG, CSR, and Sustainability', 'https://www.youtube-nocookie.com/embed/eJnQBXmZ7Ek?si=sjdR66r6yLLzj4mL', 1500),
+(@chapter1_id, 'ESG Drivers in Modern Business', 'Exploring the key drivers of ESG in today''s business landscape', 'https://www.youtube-nocookie.com/embed/eJnQBXmZ7Ek?si=sjdR66r6yLLzj4mL', 2000),
 
-(@chapter2_id, 'Global ESG Standards', 'Overview of global ESG standards and frameworks', 'https://example.com/video4', 1800),
-(@chapter2_id, 'Local and Industry Standards', 'Understanding local and industry-specific ESG standards', 'https://example.com/video5', 1500),
+(@chapter2_id, 'Global ESG Standards', 'Overview of global ESG standards and frameworks', 'https://www.youtube-nocookie.com/embed/eJnQBXmZ7Ek?si=sjdR66r6yLLzj4mL', 1800),
+(@chapter2_id, 'Local and Industry Standards', 'Understanding local and industry-specific ESG standards', 'https://www.youtube-nocookie.com/embed/eJnQBXmZ7Ek?si=sjdR66r6yLLzj4mL', 1500),
 
-(@chapter3_id, 'ESG Components', 'Identifying and understanding ESG components', 'https://example.com/video6', 1800),
-(@chapter3_id, 'Materiality Assessment', 'How to conduct a materiality assessment for ESG', 'https://example.com/video7', 2000),
+(@chapter3_id, 'ESG Components', 'Identifying and understanding ESG components', 'https://www.youtube-nocookie.com/embed/eJnQBXmZ7Ek?si=sjdR66r6yLLzj4mL', 1800),
+(@chapter3_id, 'Materiality Assessment', 'How to conduct a materiality assessment for ESG', 'https://www.youtube-nocookie.com/embed/eJnQBXmZ7Ek?si=sjdR66r6yLLzj4mL', 2000),
 
-(@chapter4_id, 'Environmental Measurement', 'Guide to measuring environmental impact', 'https://example.com/video8', 1800),
+(@chapter4_id, 'Environmental Measurement', 'Guide to measuring environmental impact', 'https://www.youtube-nocookie.com/embed/eJnQBXmZ7Ek?si=sjdR66r6yLLzj4mL', 1800),
 (@chapter4_id, 'Social and Governance Measurement', 'Measuring social and governance aspects', 'https://example.com/video9', 1800),
 (@chapter4_id, 'Greenhouse Gas Calculations', 'Understanding and calculating GHG emissions', 'https://example.com/video10', 2000),
 
