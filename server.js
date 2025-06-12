@@ -903,7 +903,7 @@ app.post('/api/stripe/confirm-payment', authenticateToken, async (req, res) => {
                     console.error('Error enrolling user:', err);
                     return res.status(500).json({ error: 'Error enrolling in course' });
                 }
-                res.json({ message: 'Payment successful and enrolled in course' });
+            res.json({ message: 'Payment successful and enrolled in course' });
             });
         } else {
             res.status(400).json({ error: 'Payment not successful' });

@@ -609,11 +609,11 @@ function showMyCourses() {
         <div class="container mt-4">
             <h2 class="mb-4">My Courses</h2>
             <div id="myCoursesList" class="row">
-                <div class="col-12 text-center">
-                    <div class="spinner-border text-primary" role="status">
-                        <span class="visually-hidden">Loading...</span>
-                    </div>
-                    <p class="mt-2">Loading your courses...</p>
+        <div class="col-12 text-center">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+            <p class="mt-2">Loading your courses...</p>
                 </div>
             </div>
         </div>
@@ -642,33 +642,33 @@ async function loadEnrolledCourses() {
             return;
         }
         myCoursesList.innerHTML = enrolledCourses.map(course => `
-            <div class="col-md-6 col-lg-4 mb-4">
-                <div class="card course-card h-100">
+                <div class="col-md-6 col-lg-4 mb-4">
+                    <div class="card course-card h-100">
                     <img src="${course.image || 'https://images.unsplash.com/photo-1473448912268-2022ce9509d8?ixlib=rb-1.2.1&auto=format&fit=crop&w=1950&q=80'}" class="card-img-top" alt="${course.title}">
-                    <div class="card-body d-flex flex-column">
-                        <h5 class="card-title">${course.title}</h5>
-                        <p class="card-text flex-grow-1">${course.description.substring(0, 150)}...</p>
-                        <div class="course-features mb-3">
+                        <div class="card-body d-flex flex-column">
+                            <h5 class="card-title">${course.title}</h5>
+                            <p class="card-text flex-grow-1">${course.description.substring(0, 150)}...</p>
+                            <div class="course-features mb-3">
                             <span class="course-feature"><i class="bi bi-clock"></i> Self-paced</span>
                             <span class="course-feature"><i class="bi bi-person"></i> Beginner</span>
-                        </div>
-                        <div class="d-flex justify-content-between align-items-center mt-auto">
-                            <span class="badge bg-success">Enrolled</span>
+                            </div>
+                            <div class="d-flex justify-content-between align-items-center mt-auto">
+                                <span class="badge bg-success">Enrolled</span>
                             <button class="btn btn-primary" onclick="viewCourse(${course.id})">Continue Learning</button>
+                            </div>
                         </div>
                     </div>
                 </div>
-            </div>
         `).join('');
     } catch (error) {
         const myCoursesList = document.getElementById('myCoursesList');
         if (myCoursesList) {
             myCoursesList.innerHTML = `
-                <div class="col-12 text-center">
+            <div class="col-12 text-center">
                     <div class="alert alert-danger">Error loading your courses. Please try again later.</div>
-                    <button class="btn btn-primary" onclick="showMyCourses()">Retry</button>
-                </div>
-            `;
+                <button class="btn btn-primary" onclick="showMyCourses()">Retry</button>
+            </div>
+        `;
         }
     }
 }
@@ -1129,11 +1129,11 @@ async function showAdminDashboard() {
     // Show loading state
     mainContent.innerHTML = `
         <div class="container mt-4">
-            <div class="col-12 text-center">
-                <div class="spinner-border text-primary" role="status">
-                    <span class="visually-hidden">Loading...</span>
-                </div>
-                <p class="mt-2">Loading admin dashboard...</p>
+        <div class="col-12 text-center">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+            <p class="mt-2">Loading admin dashboard...</p>
             </div>
         </div>
     `;
@@ -1160,8 +1160,8 @@ async function showAdminDashboard() {
                     </div>
                     <div class="col-md-3">
                         <div class="card bg-warning text-white"><div class="card-body"><h5 class="card-title">Completion Rate</h5><h2 class="card-text">${totalStats.completionRate}%</h2></div></div>
-                    </div>
-                </div>
+                            </div>
+                        </div>
                 <!-- User Progress -->
                 <div class="card mb-4"><div class="card-header"><h4>User Progress Overview</h4></div><div class="card-body"><div class="table-responsive"><table class="table"><thead><tr><th>User</th><th>Courses Enrolled</th><th>Courses Completed</th><th>Completion Rate</th></tr></thead><tbody>${userProgress.map(user => `<tr><td>${user.name}</td><td>${user.enrolledCourses}</td><td>${user.completedCourses}</td><td>${user.completionRate}%</td></tr>`).join('')}</tbody></table></div></div></div>
                 <!-- Most Unfinished Courses -->
@@ -1343,10 +1343,10 @@ async function showMyCertificates() {
         const certificatesList = document.getElementById('certificatesList');
         if (certificatesList) {
             certificatesList.innerHTML = `
-                <div class="col-12 text-center">
-                    <p class="text-danger">Error loading certificates. Please try again later.</p>
-                </div>
-            `;
+            <div class="col-12 text-center">
+                <p class="text-danger">Error loading certificates. Please try again later.</p>
+            </div>
+        `;
         }
     }
 }
