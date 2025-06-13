@@ -486,4 +486,36 @@ body {
 }
 .footer {
     flex-shrink: 0;
+}
+
+/* Update the All Courses and All Templates buttons to look like text */
+#allCoursesBtn, #allTemplatesBtn {
+    background: none !important;
+    border: none !important;
+    color: var(--text-color) !important;
+    padding: 0.5rem 1rem;
+    font-weight: 500;
+    text-decoration: none;
+    transition: color 0.3s ease;
+}
+
+#allCoursesBtn:hover, #allTemplatesBtn:hover {
+    background: none !important;
+    border: none !important;
+    color: var(--secondary-color) !important;
+    text-decoration: underline;
+}
+
+/* Add hover effect to navigation links */
+#myCoursesBtn, #myCertificatesBtn, #adminDashboardLink {
+    color: var(--text-color) !important;
+    text-decoration: none;
+    transition: color 0.3s ease;
+    padding: 0.5rem 1rem;
+    font-weight: 500;
+}
+
+#myCoursesBtn:hover, #myCertificatesBtn:hover, #adminDashboardLink:hover {
+    color: var(--secondary-color) !important;
+    text-decoration: underline;
 } 

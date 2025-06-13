@@ -263,6 +263,14 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
     }
+
+    // Check for pending questionnaire
+    const pendingCourseId = localStorage.getItem('pendingQuestionnaireCourseId');
+    if (pendingCourseId) {
+        preCourseQuestionnaireForm.setAttribute('data-course-id', pendingCourseId);
+        preCourseQuestionnaireModal.show();
+        localStorage.removeItem('pendingQuestionnaireCourseId');
+    }
 });
 
 // Display course catalog
@@ -581,11 +589,38 @@ function renderPayPalButton(courseId, price) {
                     .then(details => {
                         if (details.message === 'Enrolled successfully') {
                             paymentModal.hide();
+                            // Show success message
+                            const successAlert = document.createElement('div');
+                            successAlert.className = 'alert alert-success alert-dismissible fade show';
+                            successAlert.innerHTML = `
+                                Payment successful! You are now enrolled in the course.
+                                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                            `;
+                            document.querySelector('.modal-body').prepend(successAlert);
+                            
+                            // Show pre-course questionnaire
                             preCourseQuestionnaireForm.setAttribute('data-course-id', courseId);
                             preCourseQuestionnaireModal.show();
                         } else {
-                            alert('Payment failed or already enrolled.');
+                            // Show error message
+                            const errorAlert = document.createElement('div');
+                            errorAlert.className = 'alert alert-danger alert-dismissible fade show';
+                            errorAlert.innerHTML = `
+                                Payment failed or already enrolled. Please try again.
+                                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                            `;
+                            document.querySelector('.modal-body').prepend(errorAlert);
                         }
+                    })
+                    .catch(error => {
+                        // Show error message for network/other errors
+                        const errorAlert = document.createElement('div');
+                        errorAlert.className = 'alert alert-danger alert-dismissible fade show';
+                        errorAlert.innerHTML = `
+                            An error occurred during payment. Please try again.
+                            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                        `;
+                        document.querySelector('.modal-body').prepend(errorAlert);
                     });
                 }
             }).render('#paypal-button-container');

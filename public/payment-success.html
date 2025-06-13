@@ -47,10 +47,11 @@
                     });
 
                     if (response.ok) {
-                        // Redirect to the course catalog after 3 seconds
-                        setTimeout(() => {
-                            window.location.href = '/';
-                        }, 3000);
+                        const data = await response.json();
+                        // Store the course ID in localStorage
+                        localStorage.setItem('pendingQuestionnaireCourseId', data.courseId);
+                        // Redirect to home page where we'll show the questionnaire
+                        window.location.href = '/';
                     } else {
                         throw new Error('Payment confirmation failed');
                     }

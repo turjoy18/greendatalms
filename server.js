@@ -875,7 +875,7 @@ app.post('/api/stripe/create-payment-intent', authenticateToken, async (req, res
             currency: 'usd',
             metadata: {
                 courseId: courseId,
-                userId: req.user.id
+                userId: req.user.userId
             }
         });
 
@@ -903,14 +903,17 @@ app.post('/api/stripe/confirm-payment', authenticateToken, async (req, res) => {
                 return res.status(400).json({ error: 'Course ID not found in payment metadata' });
             }
 
-            // Enroll the user in the course
-            const query = 'INSERT INTO course_enrollments (user_id, course_id, enrollment_date) VALUES (?, ?, NOW())';
-            db.query(query, [req.user.userId, courseId], (err, result) => {
+            // Enroll the user in the course with payment_id
+            const query = 'INSERT INTO course_enrollments (user_id, course_id, payment_id, enrollment_date) VALUES (?, ?, ?, NOW())';
+            db.query(query, [req.user.userId, courseId, paymentIntentId], (err, result) => {
                 if (err) {
                     console.error('Error enrolling user:', err);
                     return res.status(500).json({ error: 'Error enrolling in course' });
                 }
-                res.json({ message: 'Payment successful and enrolled in course' });
+                res.json({ 
+                    message: 'Payment successful and enrolled in course',
+                    courseId: courseId
+                });
             });
         } else {
             res.status(400).json({ error: 'Payment not successful' });
